@@ -13,6 +13,11 @@ public interface IUserRepository
     Task<User?> FindByEmailAsync(string normalizedEmail, CancellationToken ct);
 
     Task SaveAsync(CancellationToken ct);
+
+    // Counts one wrong password in a single atomic UPDATE, so parallel guesses cannot read the same
+    // counter. The count restarts after an expired lock and reaching maxAttempts sets the lock. An
+    // active lock is never extended. Returns the active lock end, or null if the account is not locked.
+    Task<DateTimeOffset?> RecordFailedLoginAsync(Guid userId, DateTimeOffset now, int maxAttempts, TimeSpan lockFor, CancellationToken ct);
 }
 
 public interface IPasswordHasher

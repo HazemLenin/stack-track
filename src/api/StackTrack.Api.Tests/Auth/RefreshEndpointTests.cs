@@ -121,11 +121,73 @@ public class RefreshEndpointTests(PostgresFixture db)
         using var client = RawClient(factory);
         var (_, first) = await Register(client);
         var second = CookieValue(await Refresh(client, first));
+        _clock.Advance(TimeSpan.FromMinutes(1));
 
         (await Refresh(client, first)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
         (await Refresh(client, second)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await Stored(second)).IsRevoked.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Refresh_reuse_revokes_every_hop_of_a_longer_chain()
+    {
+        using var factory = Factory();
+        using var client = RawClient(factory);
+        var (_, a) = await Register(client);
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        var b = CookieValue(await Refresh(client, a));
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        var c = CookieValue(await Refresh(client, b));
+        _clock.Advance(TimeSpan.FromMinutes(1));
+
+        (await Refresh(client, a)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        (await Stored(b)).IsRevoked.Should().BeTrue();
+        (await Stored(c)).IsRevoked.Should().BeTrue();
+        (await Refresh(client, c)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Replaying_a_just_rotated_token_inside_the_grace_window_does_not_kill_the_session()
+    {
+        // Two tabs refreshing together: the slower one must fail without revoking the winner's new token.
+        using var factory = Factory();
+        using var client = RawClient(factory);
+        var (_, first) = await Register(client);
+        var second = CookieValue(await Refresh(client, first));
+        _clock.Advance(TimeSpan.FromSeconds(5));
+
+        (await Refresh(client, first)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        (await Stored(second)).IsRevoked.Should().BeFalse();
+        (await Refresh(client, second)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Refresh_failure_to_claim_leaves_no_orphan_token()
+    {
+        using var factory = Factory();
+        using var client = RawClient(factory);
+        var (email, token) = await Register(client);
+
+        await Task.WhenAll(Refresh(client, token), Refresh(client, token), Refresh(client, token));
+
+        await using var context = db.CreateContext();
+        var user = await context.Users.SingleAsync(u => u.Email == email);
+        var rows = await context.RefreshTokens.Where(t => t.UserId == user.Id).ToListAsync();
+        // The original plus exactly one successor, whatever the interleaving.
+        rows.Should().HaveCount(2);
+        rows.Count(t => !t.IsRevoked).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Refresh_cookie_longer_than_256_chars_returns_400()
+    {
+        using var factory = Factory();
+        using var client = RawClient(factory);
+
+        (await Refresh(client, new string('a', 300))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]

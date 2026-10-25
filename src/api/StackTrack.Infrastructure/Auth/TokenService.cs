@@ -14,6 +14,8 @@ namespace StackTrack.Infrastructure.Auth;
 
 public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimeProvider clock) : ITokenService
 {
+    static readonly TimeSpan RotationGrace = TimeSpan.FromSeconds(10);
+
     readonly JwtOptions _jwt = options.Value;
 
     public async Task<IssuedTokens> IssueAsync(User user, CancellationToken ct)
@@ -59,7 +61,11 @@ public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimePro
 
         if (stored.IsRevoked)
         {
-            // A used token is being replayed: treat the whole chain after it as stolen.
+            // Two tabs refreshing together replay a token rotated a moment ago. Fail the slower one
+            // without revoking the winner's new token.
+            if (stored.ReplacedByTokenId is not null && now - stored.UpdatedAt < RotationGrace) return null;
+
+            // A used token is being replayed later: treat the whole chain after it as stolen.
             await RevokeChainAfterAsync(stored, ct);
             return null;
         }
@@ -69,18 +75,27 @@ public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimePro
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == stored.UserId, ct);
         if (user is null || !user.IsActive) return null;
 
-        // Atomic claim: of two concurrent requests with the same token, only one updates a row.
-        var claimed = await db.RefreshTokens
-            .Where(t => t.Id == stored.Id && !t.IsRevoked)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.IsRevoked, true).SetProperty(t => t.UpdatedAt, now), ct);
-        if (claimed == 0) return null;
-
+        // Insert the successor and revoke the old token in one transaction: either both happen or neither.
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var issued = await IssueAsync(user, ct);
 
         var newHash = Hash(issued.RefreshToken);
         var newId = await db.RefreshTokens.Where(t => t.TokenHash == newHash).Select(t => t.Id).SingleAsync(ct);
-        await db.RefreshTokens.Where(t => t.Id == stored.Id)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.ReplacedByTokenId, newId), ct);
+
+        // Atomic claim: of two concurrent requests with the same token, only one updates a row.
+        var claimed = await db.RefreshTokens
+            .Where(t => t.Id == stored.Id && !t.IsRevoked)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.IsRevoked, true)
+                .SetProperty(t => t.ReplacedByTokenId, (Guid?)newId)
+                .SetProperty(t => t.UpdatedAt, now), ct);
+        if (claimed == 0)
+        {
+            await transaction.RollbackAsync(ct);
+            return null;
+        }
+
+        await transaction.CommitAsync(ct);
         return issued;
     }
 

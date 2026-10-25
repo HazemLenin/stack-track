@@ -148,6 +148,24 @@ public class SignInEndpointTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Parallel_wrong_guesses_still_trip_the_lock()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateApiClient();
+        var email = await Register(client);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => SignIn(client, email, "Wrong12345")));
+
+        // A request whose own guess did not trip the lock may still answer "locked" if a sibling did.
+        results.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.Unauthorized || r.StatusCode == HttpStatusCode.Locked);
+        results.Count(r => r.StatusCode == HttpStatusCode.Unauthorized).Should().BeLessThanOrEqualTo(4);
+        results.Count(r => r.StatusCode == HttpStatusCode.Locked).Should().BeGreaterThanOrEqualTo(8);
+        var user = await Find(email);
+        user.FailedLoginCount.Should().Be(5);
+        user.LockedUntil.Should().Be(Start.AddMinutes(15));
+    }
+
+    [Fact]
     public async Task Locked_account_rejects_correct_password()
     {
         using var factory = Factory();

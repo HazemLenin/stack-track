@@ -35,17 +35,8 @@ public class SignInCommandHandler(IUserRepository users, IPasswordHasher hasher,
 
         if (!hasher.Verify(user.PasswordHash, request.Password))
         {
-            // An expired lock starts a fresh count.
-            if (user.LockedUntil is not null) user.FailedLoginCount = 0;
-            user.LockedUntil = null;
-
-            // ponytail: read-modify-write, two parallel wrong guesses can undercount by one. Use ExecuteUpdate if it matters.
-            user.FailedLoginCount++;
-            if (user.FailedLoginCount >= MaxFailedAttempts) user.LockedUntil = now + LockDuration;
-            await users.SaveAsync(ct);
-
-            if (user.LockedUntil is { } until) throw new AccountLockedException(until);
-            throw new InvalidCredentialsException();
+            var lockedUntil = await users.RecordFailedLoginAsync(user.Id, now, MaxFailedAttempts, LockDuration, ct);
+            throw lockedUntil is { } until ? new AccountLockedException(until) : new InvalidCredentialsException();
         }
 
         if (!user.IsActive) throw new AccountDeactivatedException();

@@ -16,6 +16,24 @@ public class UserRepository(AppDbContext db) : IUserRepository
 
     public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 
+    public async Task<DateTimeOffset?> RecordFailedLoginAsync(
+        Guid userId, DateTimeOffset now, int maxAttempts, TimeSpan lockFor, CancellationToken ct)
+    {
+        var lockUntil = (DateTimeOffset?)(now + lockFor);
+
+        // Both SET expressions read the row as it was before this UPDATE, so they agree on the new count.
+        await db.Users
+            .Where(u => u.Id == userId && (u.LockedUntil == null || u.LockedUntil <= now))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.FailedLoginCount, u => (u.LockedUntil == null ? u.FailedLoginCount : 0) + 1)
+                .SetProperty(u => u.LockedUntil,
+                    u => (u.LockedUntil == null ? u.FailedLoginCount : 0) + 1 >= maxAttempts ? lockUntil : null)
+                .SetProperty(u => u.UpdatedAt, now), ct);
+
+        var until = await db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => u.LockedUntil).SingleAsync(ct);
+        return until > now ? until : null;
+    }
+
     public async Task<bool> TryAddAsync(User user, CancellationToken ct)
     {
         db.Users.Add(user);
