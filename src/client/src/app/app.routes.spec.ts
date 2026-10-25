@@ -28,7 +28,7 @@ describe('routes', () => {
   });
 
   describe('signed out', () => {
-    for (const path of ['/', '/boards', '/admin', '/my-cards']) {
+    for (const path of ['/', '/boards', '/admin/users', '/my-cards']) {
       it(`sends ${path} to sign in and remembers the page`, async () => {
         await harness.navigateByUrl(path);
         const wanted = path === '/' ? '/boards' : path;
@@ -75,12 +75,23 @@ describe('routes', () => {
       expect(document.title).toBe('Stack Track');
     });
 
-    for (const name of ['admin', 'my-cards']) {
-      it(`renders ${name}`, async () => {
-        await harness.navigateByUrl('/' + name);
-        expect(h1()).toBe(name);
-      });
-    }
+    it('renders my-cards', async () => {
+      await harness.navigateByUrl('/my-cards');
+      expect(h1()).toBe('my-cards');
+    });
+
+    it('sends a Member away from /admin/users to My boards', async () => {
+      await harness.navigateByUrl('/admin/users');
+      expect(url()).toBe('/boards');
+      expect(h1()).toBe('My boards');
+    });
+
+    it('lets an Admin into /admin/users and redirects /admin there', async () => {
+      user.set({ ...signedIn, role: 'Admin' });
+      await harness.navigateByUrl('/admin');
+      expect(url()).toBe('/admin/users');
+      expect(h1()).toBe('admin');
+    });
 
     for (const page of ['/auth/sign-in', '/auth/sign-up', '/auth']) {
       it(`keeps the user away from ${page}`, async () => {

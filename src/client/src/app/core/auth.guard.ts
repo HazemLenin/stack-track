@@ -10,5 +10,9 @@ export const authGuard: CanActivateFn = (_route, state) => {
   return inject(Router).createUrlTree(['/auth/sign-in'], { queryParams });
 };
 
+// Runs after authGuard, so a user is present. The server enforces roles too; this only hides the area.
+export const adminGuard: CanActivateFn = () =>
+  inject(AuthService).user()?.role === 'Admin' ? true : inject(Router).createUrlTree(['/boards']);
+
 export const guestGuard: CanActivateFn = () =>
   inject(AuthService).user() ? inject(Router).createUrlTree(['/boards']) : true;

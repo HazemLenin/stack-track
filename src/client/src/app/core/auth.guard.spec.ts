@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { AuthService, UserDto } from '../features/auth/auth.service';
-import { authGuard, guestGuard } from './auth.guard';
+import { adminGuard, authGuard, guestGuard } from './auth.guard';
 
 describe('guards', () => {
   const user = signal<UserDto | null>(null);
@@ -44,5 +44,16 @@ describe('guards', () => {
     user.set({ id: '1', email: 's@x.com', displayName: 'Sara', role: 'Member' });
     const result = run(guestGuard, '/auth/sign-in') as UrlTree;
     expect(TestBed.inject(Router).serializeUrl(result)).toBe('/boards');
+  });
+
+  it('adminGuard sends a Member to My boards', () => {
+    user.set({ id: '1', email: 's@x.com', displayName: 'Sara', role: 'Member' });
+    const result = run(adminGuard, '/admin/users') as UrlTree;
+    expect(TestBed.inject(Router).serializeUrl(result)).toBe('/boards');
+  });
+
+  it('adminGuard lets an Admin through', () => {
+    user.set({ id: '1', email: 'a@x.com', displayName: 'Ada', role: 'Admin' });
+    expect(run(adminGuard, '/admin/users')).toBe(true);
   });
 });
