@@ -8,12 +8,20 @@ public interface IUserRepository
 
     // Returns false when the email unique index rejects the insert (lost a race).
     Task<bool> TryAddAsync(User user, CancellationToken ct);
+
+    // Tracked entity: changes are persisted by SaveAsync.
+    Task<User?> FindByEmailAsync(string normalizedEmail, CancellationToken ct);
+
+    Task SaveAsync(CancellationToken ct);
 }
 
 public interface IPasswordHasher
 {
     string Hash(string password);
     bool Verify(string hash, string password);
+
+    // Spends the same time as Verify, used when the email is unknown so timing does not reveal it.
+    void VerifyDummy(string password);
 }
 
 public interface ITokenService

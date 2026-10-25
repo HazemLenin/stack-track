@@ -11,6 +11,11 @@ public class UserRepository(AppDbContext db) : IUserRepository
     public Task<bool> EmailExistsAsync(string normalizedEmail, CancellationToken ct) =>
         db.Users.AnyAsync(u => u.Email == normalizedEmail, ct);
 
+    public Task<User?> FindByEmailAsync(string normalizedEmail, CancellationToken ct) =>
+        db.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail, ct);
+
+    public Task SaveAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+
     public async Task<bool> TryAddAsync(User user, CancellationToken ct)
     {
         db.Users.Add(user);
