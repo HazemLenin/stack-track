@@ -15,8 +15,26 @@ public record ReadBoard(Guid BoardId) : IRequest<string>, IBoardScoped;
 
 public record RenameBoard(Guid BoardId) : IRequest<string>, IBoardScoped, IWriteRequest;
 
-public class BoardProbeHandlers : IRequestHandler<ReadBoard, string>, IRequestHandler<RenameBoard, string>
+public record ReadList(Guid ListId) : IRequest<string>, IListScoped;
+
+public record ReadCard(Guid CardId) : IRequest<string>, ICardScoped;
+
+public record ReadLabel(Guid LabelId) : IRequest<string>, ILabelScoped;
+
+public record ReadComment(Guid CommentId) : IRequest<string>, ICommentScoped;
+
+public class BoardProbeHandlers :
+    IRequestHandler<ReadBoard, string>, IRequestHandler<RenameBoard, string>, IRequestHandler<ReadList, string>,
+    IRequestHandler<ReadCard, string>, IRequestHandler<ReadLabel, string>, IRequestHandler<ReadComment, string>
 {
+    public Task<string> Handle(ReadList request, CancellationToken ct) => Task.FromResult("ok");
+
+    public Task<string> Handle(ReadCard request, CancellationToken ct) => Task.FromResult("ok");
+
+    public Task<string> Handle(ReadLabel request, CancellationToken ct) => Task.FromResult("ok");
+
+    public Task<string> Handle(ReadComment request, CancellationToken ct) => Task.FromResult("ok");
+
     public Task<string> Handle(ReadBoard request, CancellationToken ct) => Task.FromResult("ok");
 
     public Task<string> Handle(RenameBoard request, CancellationToken ct) => Task.FromResult("ok");
@@ -107,5 +125,59 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
 
         (await Send(admin, new ReadBoard(board.Id))).Should().Be("ok");
         await FluentActions.Awaiting(() => Send(admin, new RenameBoard(board.Id))).Should().ThrowAsync<ForbiddenException>();
+    }
+
+    // A board with one list, card, label and comment, owned by the returned user.
+    async Task<(User Owner, Dictionary<string, IRequest<string>> Requests)> SeedChildren()
+    {
+        var (owner, board) = await SeedBoard();
+        var list = new BoardList { BoardId = board.Id, Name = "To do" };
+        var card = new Card { ListId = list.Id, Title = "Write docs" };
+        var label = new Label { BoardId = board.Id, Name = "Bug", Color = "#ff0000" };
+        var comment = new Comment { CardId = card.Id, AuthorId = owner.Id, Body = "On it" };
+        await Save(list, label);
+        await Save(card);
+        await Save(comment);
+        return (owner, new()
+        {
+            ["list"] = new ReadList(list.Id),
+            ["card"] = new ReadCard(card.Id),
+            ["label"] = new ReadLabel(label.Id),
+            ["comment"] = new ReadComment(comment.Id),
+        });
+    }
+
+    [Theory]
+    [InlineData("list")]
+    [InlineData("card")]
+    [InlineData("label")]
+    [InlineData("comment")]
+    public async Task NonMember_gets_NotFound_for_list_card_label_comment_ids(string kind)
+    {
+        var (owner, requests) = await SeedChildren();
+        var other = NewUser();
+        await Save(other);
+
+        (await Send(owner, requests[kind])).Should().Be("ok");
+        await FluentActions.Awaiting(() => Send(other, requests[kind])).Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Theory]
+    [InlineData("list")]
+    [InlineData("card")]
+    [InlineData("label")]
+    [InlineData("comment")]
+    public async Task Unknown_child_id_gets_NotFound(string kind)
+    {
+        var (owner, _) = await SeedChildren();
+        IRequest<string> request = kind switch
+        {
+            "list" => new ReadList(Guid.NewGuid()),
+            "card" => new ReadCard(Guid.NewGuid()),
+            "label" => new ReadLabel(Guid.NewGuid()),
+            _ => new ReadComment(Guid.NewGuid()),
+        };
+
+        await FluentActions.Awaiting(() => Send(owner, request)).Should().ThrowAsync<NotFoundException>();
     }
 }
