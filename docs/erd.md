@@ -165,3 +165,32 @@ Deleting a user is not supported. A user who leaves is deactivated (`User.IsActi
 - A card assignee must be a member of the card's board.
 - A card's label must belong to the card's board.
 - The board owner is added as a `BoardMember` when the board is created.
+
+## Ordering of lists and cards
+
+`List.Position` (within a board) and `Card.Position` (within a list) are `double precision` numbers. Items are shown in ascending `Position` order. The value only has to sort correctly; it carries no other meaning. Index `(ListId, Position)` and `(BoardId, Position)` are non-unique, so a half-finished move never violates a constraint.
+
+Moving an item changes one row: only the moved item gets a new `Position`, computed from its new neighbours. Nothing else in the list is rewritten.
+
+| Insert at | New `Position` |
+|---|---|
+| Empty list | `1000` |
+| End | last `Position` + `1000` |
+| Start | first `Position` / 2 |
+| Between A and B | (A + B) / 2 |
+
+Moving a card to another list also sets `ListId`, still one row.
+
+### Example: move a card between two others
+
+A list holds three cards: A = 1000, B = 2000, C = 3000. Order is A, B, C. Move C between A and B:
+
+1. Neighbours of the target slot are A (1000) and B (2000).
+2. New position of C = (1000 + 2000) / 2 = 1500.
+3. `UPDATE Card SET ListId = <same>, Position = 1500 WHERE Id = <C>`. A and B keep 1000 and 2000.
+
+Order is now A (1000), C (1500), B (2000).
+
+### Rebalancing
+
+Repeated inserts into the same gap halve it each time. When the gap between the two neighbours falls below `0.000001` (about 30 inserts into one gap), the API renumbers that one list to 1000, 2000, 3000, ... in a single transaction, then performs the insert. This is rare and touches one list only.
