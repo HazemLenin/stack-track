@@ -1,6 +1,9 @@
 <mat-toolbar class="toolbar">
   <a routerLink="/" class="brand">Stack Track</a>
   <span class="spacer"></span>
+  @if (isAdmin()) {
+    <a mat-button routerLink="/admin/users">Admin</a>
+  }
   @if (user(); as user) {
     <span class="user">
       <span class="avatar" aria-hidden="true">{{ user.displayName.charAt(0).toUpperCase() }}</span>
