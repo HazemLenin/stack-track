@@ -62,6 +62,10 @@ describe('SignUpPage', () => {
     expect(rule('len').classList).toContain('ok');
   });
 
+  it('links to sign in', () => {
+    expect(el.querySelector('a[href="/auth/sign-in"]')).toBeTruthy();
+  });
+
   it('shows no rule failures before the user types', () => {
     expect(el.querySelectorAll('[data-rule].fail').length).toBe(0);
   });

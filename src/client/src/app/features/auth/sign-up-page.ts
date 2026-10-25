@@ -11,7 +11,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from './auth.service';
 import { passwordRules } from './password-rules';
 
@@ -28,9 +28,9 @@ const matchesPassword = (c: AbstractControl): ValidationErrors | null =>
 
 @Component({
   selector: 'app-sign-up-page',
-  imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule],
+  imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, RouterLink],
   templateUrl: './sign-up-page.html',
-  styleUrl: './sign-up-page.scss',
+  styleUrls: ['./auth-card.scss', './sign-up-page.scss'],
 })
 export class SignUpPage {
   private readonly auth = inject(AuthService);

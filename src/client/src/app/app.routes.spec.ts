@@ -1,51 +1,99 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
+import { AuthService, UserDto } from './features/auth/auth.service';
 
 describe('routes', () => {
+  const user = signal<UserDto | null>(null);
+  const signedIn: UserDto = { id: '1', email: 's@x.com', displayName: 'Sara', role: 'Member' };
   let harness: RouterTestingHarness;
   const h1 = () => (harness.routeNativeElement as HTMLElement).querySelector('h1')?.textContent;
+  const url = () => TestBed.inject(Router).url;
 
   beforeEach(async () => {
+    user.set(null);
     TestBed.configureTestingModule({
-      providers: [provideRouter(routes), provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideRouter(routes),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: AuthService, useValue: { user, accessToken: () => null } },
+      ],
     });
     harness = await RouterTestingHarness.create();
   });
 
-  it('redirects / to boards', async () => {
-    await harness.navigateByUrl('/');
-    expect(TestBed.inject(Router).url).toBe('/boards');
-    expect(h1()).toBe('My boards');
-  });
+  describe('signed out', () => {
+    for (const path of ['/', '/boards', '/admin', '/my-cards']) {
+      it(`sends ${path} to sign in and remembers the page`, async () => {
+        await harness.navigateByUrl(path);
+        const wanted = path === '/' ? '/boards' : path;
+        expect(url()).toBe(`/auth/sign-in?returnUrl=${encodeURIComponent(wanted)}`);
+        expect(h1()).toBe('Welcome back');
+      });
+    }
 
-  it('redirects /auth to sign up', async () => {
-    await harness.navigateByUrl('/auth');
-    expect(TestBed.inject(Router).url).toBe('/auth/sign-up');
-    expect(h1()).toBe('Create your account');
-  });
-
-  for (const name of ['admin', 'my-cards']) {
-    it(`renders ${name}`, async () => {
-      await harness.navigateByUrl('/' + name);
-      expect(h1()).toBe(name);
+    it('keeps the query string of the page the user wanted', async () => {
+      await harness.navigateByUrl('/boards?tab=cards');
+      expect(url()).toBe('/auth/sign-in?returnUrl=%2Fboards%3Ftab%3Dcards');
     });
-  }
 
-  it('renders boards with the app title', async () => {
-    await harness.navigateByUrl('/boards');
-    expect(h1()).toBe('My boards');
-    expect(document.title).toBe('Stack Track');
-  });
+    it('redirects /auth to sign in', async () => {
+      await harness.navigateByUrl('/auth');
+      expect(url()).toBe('/auth/sign-in');
+      expect(h1()).toBe('Welcome back');
+    });
 
-  for (const url of ['/does/not/exist', '/boards/xyz/nope', '/admin/zzz']) {
-    it(`shows not found for ${url}`, async () => {
-      await harness.navigateByUrl(url);
+    it('renders sign up', async () => {
+      await harness.navigateByUrl('/auth/sign-up');
+      expect(h1()).toBe('Create your account');
+    });
+
+    it('does not guard the not found page', async () => {
+      await harness.navigateByUrl('/does/not/exist');
       expect(h1()).toBe('Page not found');
       expect(document.title).toBe('Page not found - Stack Track');
     });
-  }
+  });
+
+  describe('signed in', () => {
+    beforeEach(() => user.set(signedIn));
+
+    it('redirects / to boards', async () => {
+      await harness.navigateByUrl('/');
+      expect(url()).toBe('/boards');
+      expect(h1()).toBe('My boards');
+    });
+
+    it('renders boards with the app title', async () => {
+      await harness.navigateByUrl('/boards');
+      expect(h1()).toBe('My boards');
+      expect(document.title).toBe('Stack Track');
+    });
+
+    for (const name of ['admin', 'my-cards']) {
+      it(`renders ${name}`, async () => {
+        await harness.navigateByUrl('/' + name);
+        expect(h1()).toBe(name);
+      });
+    }
+
+    for (const page of ['/auth/sign-in', '/auth/sign-up', '/auth']) {
+      it(`keeps the user away from ${page}`, async () => {
+        await harness.navigateByUrl(page);
+        expect(url()).toBe('/boards');
+      });
+    }
+
+    for (const missing of ['/boards/xyz/nope', '/admin/zzz']) {
+      it(`shows not found for ${missing}`, async () => {
+        await harness.navigateByUrl(missing);
+        expect(h1()).toBe('Page not found');
+      });
+    }
+  });
 });
