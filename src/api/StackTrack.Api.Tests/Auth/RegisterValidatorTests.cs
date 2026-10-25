@@ -64,6 +64,15 @@ public class RegisterValidatorTests
     }
 
     [Fact]
+    public void Password_over_128_chars_fails() =>
+        Validator.Validate(Valid(password: "Aa1" + new string('x', 126))).Errors
+            .Should().Contain(e => e.PropertyName == "Password");
+
+    [Fact]
+    public void Password_of_exactly_128_chars_passes() =>
+        Validator.Validate(Valid(password: "Aa1" + new string('x', 125))).IsValid.Should().BeTrue();
+
+    [Fact]
     public void Valid_password_passes() =>
         Validator.Validate(Valid(password: "Valid1234")).IsValid.Should().BeTrue();
 

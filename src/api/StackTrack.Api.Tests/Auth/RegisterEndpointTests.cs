@@ -45,6 +45,9 @@ public class RegisterEndpointTests(PostgresFixture db)
         user.Role.Should().Be(UserRole.Member);
         user.IsActive.Should().BeTrue();
 
+        var raw = await response.Content.ReadAsStringAsync();
+        raw.Should().NotContain("Valid1234").And.NotContainEquivalentOf("passwordHash");
+
         var body = await Json(response);
         body.GetProperty("user").GetProperty("role").GetString().Should().Be("Member");
         body.TryGetProperty("refreshToken", out _).Should().BeFalse();

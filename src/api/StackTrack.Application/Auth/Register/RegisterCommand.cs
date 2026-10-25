@@ -20,6 +20,7 @@ public class RegisterCommandValidator : AbstractValidator<RegisterCommand>
 
         RuleFor(c => c.Password)
             .MinimumLength(8).WithMessage("At least 8 characters")
+            .MaximumLength(128).WithMessage("At most 128 characters")
             .Matches("[A-Z]").WithMessage("One uppercase letter")
             .Matches("[a-z]").WithMessage("One lowercase letter")
             .Matches("[0-9]").WithMessage("One digit");
