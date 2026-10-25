@@ -35,6 +35,11 @@ Trello-style task tracker. Monorepo: .NET 10 API + Angular 21 client. Jira proje
 - Allowed Jira transitions: To Do -> In Progress -> In Review. Never move a ticket to Done
 - If acceptance criteria are unclear, comment on the ticket and stop. Don't guess
 
+## Notion docs
+- Developer docs live on Notion: https://app.notion.com/p/4044423e6f5981499e47e5759bc48950 (page "Stack Track — Developer Docs")
+- After implementing each feature, add an entry to that page's "Feature log" (ticket, what it does, where the code lives, how to try it). Update the layout/commands/conventions sections if they changed
+- Do this before opening the PR, and link nothing secret there
+
 ## Don't
 - Don't add NuGet/npm packages without asking
 - Don't edit existing migrations, add a new one
