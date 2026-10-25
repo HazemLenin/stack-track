@@ -183,6 +183,34 @@ describe('AuthService', () => {
     http.expectOne('/api/auth/refresh');
   });
 
+  it('a refresh in flight when someone signs in does not replace that sign in', () => {
+    service.refresh().subscribe({ error: () => undefined });
+    const stale = http.expectOne('/api/auth/refresh');
+    service.signIn('sara@example.com', 'Valid1234').subscribe();
+    http.expectOne('/api/auth/sign-in').flush({ ...response, accessToken: 'jwt-new' });
+
+    stale.flush({ ...response, accessToken: 'jwt-stale' });
+
+    expect(service.accessToken()).toBe('jwt-new');
+  });
+
+  it('an earlier sign out settling does not unblock the refresh guard of a later one', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+    service.signOut().subscribe();
+    const first = http.expectOne('/api/auth/sign-out');
+    service.signIn('sara@example.com', 'Valid1234').subscribe();
+    http.expectOne('/api/auth/sign-in').flush(response);
+    service.signOut().subscribe();
+    const second = http.expectOne('/api/auth/sign-out');
+
+    first.flush(null, { status: 204, statusText: 'No Content' });
+    service.refresh().subscribe({ error: () => undefined });
+
+    http.expectNone('/api/auth/refresh');
+    second.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
   it('a refresh refused after the user signed out is not reported as an expired session', () => {
     service.register(request).subscribe();
     http.expectOne('/api/auth/register').flush(response);

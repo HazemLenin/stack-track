@@ -52,6 +52,7 @@ export class AuthService {
 
   // True from the sign out click until its request settles: no refresh may bring the session back meanwhile.
   private signingOut = false;
+  private signOutSeq = 0;
 
   // True once a session that existed (this tab or an earlier visit) was refused by the API.
   readonly sessionExpired = signal(false);
@@ -117,17 +118,22 @@ export class AuthService {
     // and its result is dropped) and awaited, so the request revokes the cookie that refresh rotated to.
     this.generation++;
     this.signingOut = true;
+    const seq = ++this.signOutSeq;
     this.session.set(null);
     this.setSignedBefore(false);
     // ponytail: waits at most 5s for a hung refresh, then revokes whatever cookie the browser holds
     const settled = this.refreshing?.pipe(timeout(5000), catchError(() => EMPTY), ignoreElements()) ?? EMPTY;
-    return concat(settled, this.http.post<void>(`${this.baseUrl}/auth/sign-out`, null)).pipe(
-      finalize(() => (this.signingOut = false)),
+    return concat(settled, this.http.post<void>(`${this.baseUrl}/auth/sign-out`, null).pipe(timeout(15000))).pipe(
+      finalize(() => {
+        // Only the latest sign out may lift the guard: an earlier one settling late must not.
+        if (seq === this.signOutSeq) this.signingOut = false;
+      }),
     );
   }
 
   // A fresh sign in or registration: any refresh still shared from an earlier session is not reused.
   private begin(response: AuthResponse): void {
+    this.generation++;
     this.refreshing = null;
     this.signingOut = false;
     this.start(response);
