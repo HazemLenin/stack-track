@@ -15,7 +15,7 @@
 | Rule / AC | Current state | Action |
 |-----------|---------------|--------|
 | Central enforcement, on by default | `IBoardAccess` (KAN-20) answers a level, nothing calls it | MediatR `BoardAccessBehavior` (Task 1) |
-| No access == not found | No `NotFoundException` | New exception + 404 mapping (Task 1) |
+| No access == not found | `NotFoundException` + 404 mapping exist from KAN-21 | Reuse; add 403 mapping (Task 1) |
 | Child items by id (list, card, label, comment) | No resolver | `IBoardAccess` resolves the owning board id from child ids, in one query per kind (Task 2) |
 | Move card into inaccessible board | No move feature | Rule in the behavior: a request that references two scopes needs access to both; card stays (Task 3) |
 | Lost access in UI | No board API calls yet | Interceptor on 404 from `boards/*` (Task 4) |
@@ -44,7 +44,7 @@
 
 ## Files
 
-- API: `Application/Boards/{IBoardScoped.cs (markers), BoardAccessBehavior.cs}`, `Application/Errors/NotFoundException.cs`, `IBoardAccess` additions (child resolvers), `Infrastructure/Boards/BoardAccess.cs`, `Application/DependencyInjection.cs` (register behavior after validation), `Api/Errors/GlobalExceptionHandler.cs` (404 + 403 cases)
+- API: `Application/Boards/{IBoardScoped.cs (markers), BoardAccessBehavior.cs}`, `IBoardAccess` additions (child resolvers), `Infrastructure/Boards/BoardAccess.cs`, `Application/DependencyInjection.cs` (register behavior after validation), `Api/Errors/GlobalExceptionHandler.cs` (404 + 403 cases)
 - Tests: `Api.Tests/Boards/BoardAccessBehaviorTests.cs`, `Api.Tests/ArchitectureTests.cs` (extend), `ErrorHandlingTests.cs` (404 shape)
 - Client: `core/board-access.interceptor.ts` (+ spec), `app.config.ts` (register), uses existing `ToastService`
 
