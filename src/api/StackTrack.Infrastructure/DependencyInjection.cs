@@ -56,7 +56,6 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IUserAdminRepository, UserAdminRepository>();
-        services.AddScoped<IUserAdminRepository, UserAdminRepository>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<IBoardAccess, BoardAccess>();

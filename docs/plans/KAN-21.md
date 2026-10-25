@@ -62,7 +62,7 @@
 - [ ] Commit `KAN-21: add admin users client service`
 
 ### Task 4: Users page (KAN-76)
-- [ ] Specs: renders rows, page size 20, debounced search, sort headers, paginator, own row actions disabled, confirm dialog gates deactivate, role select, API error toast
+- [ ] Specs: renders rows, page size 20, debounced search, sort headers, paginator, own row actions disabled, confirm dialog gates deactivate, role select (API errors are toasted by the existing error interceptor)
 - [ ] Impl: standalone page with signals, `MatTable`/`MatPaginator`/`MatSort`/`MatDialog`; route `admin/users`
 - [ ] Commit `KAN-21: add admin users page`
 

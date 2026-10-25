@@ -13,7 +13,7 @@ public class ListUsersQueryValidator : AbstractValidator<ListUsersQuery>
         RuleFor(q => q.Search).MaximumLength(100);
         RuleFor(q => q.Sort).Must(s => s is "name" or "created").WithMessage("Sort must be name or created");
         RuleFor(q => q.Dir).Must(d => d is "asc" or "desc").WithMessage("Dir must be asc or desc");
-        RuleFor(q => q.Page).GreaterThanOrEqualTo(1);
+        RuleFor(q => q.Page).InclusiveBetween(1, 10_000);
     }
 }
 

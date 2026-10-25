@@ -4,7 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { By } from '@angular/platform-browser';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
 import { AdminUser, AdminUsersService, UserPage } from './admin-users.service';
 import { AdminUsersPage } from './admin-users-page';
@@ -87,6 +87,17 @@ describe('AdminUsersPage', () => {
     expect(api.list).toHaveBeenLastCalledWith({ search: '', sort: 'created', dir: 'desc', page: 1 });
     fixture.debugElement.query(By.directive(MatPaginator)).componentInstance.page.emit({ pageIndex: 1, pageSize: 20, length: 45 });
     expect(api.list).toHaveBeenLastCalledWith({ search: '', sort: 'created', dir: 'desc', page: 2 });
+  });
+
+  it('ignores a slower response for an older query', () => {
+    const slow = new Subject<UserPage>();
+    api.list.mockReturnValueOnce(slow).mockReturnValueOnce(of(page([user('new')], 1)));
+    fixture.debugElement.query(By.directive(MatPaginator)).componentInstance.page.emit({ pageIndex: 1, pageSize: 20, length: 45 });
+    fixture.debugElement.query(By.directive(MatPaginator)).componentInstance.page.emit({ pageIndex: 2, pageSize: 20, length: 45 });
+    slow.next(page([user('old')], 1));
+    fixture.detectChanges();
+    expect(rows().length).toBe(1);
+    expect(rows()[0].textContent).toContain('new@example.com');
   });
 
   it('disables actions on own row', () => {

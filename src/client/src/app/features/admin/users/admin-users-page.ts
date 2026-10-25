@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { PageEvent, MatPaginatorModule } from '@angular/material/paginator';
@@ -40,8 +40,10 @@ export class AdminUsersPage {
 
   private query: ListUsersParams = { search: '', sort: 'name', dir: 'asc', page: 1 };
   private debounce?: ReturnType<typeof setTimeout>;
+  private requestId = 0;
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.debounce));
     this.load();
   }
 
@@ -85,7 +87,12 @@ export class AdminUsersPage {
   }
 
   private load(): void {
-    this.api.list(this.query).subscribe({ next: (d) => this.data.set(d), error: () => undefined });
+    // Only the newest request may update the table: a slower, older response is dropped.
+    const id = ++this.requestId;
+    this.api.list(this.query).subscribe({
+      next: (d) => id === this.requestId && this.data.set(d),
+      error: () => undefined,
+    });
   }
 
   // The error interceptor already toasts failures; reload either way so the table shows the truth.

@@ -136,6 +136,7 @@ public class UsersEndpointTests(PostgresFixture db)
 
     [Theory]
     [InlineData("page=0")]
+    [InlineData("page=2147483647")]
     [InlineData("sort=password")]
     [InlineData("dir=sideways")]
     public async Task List_rejects_invalid_query(string query)

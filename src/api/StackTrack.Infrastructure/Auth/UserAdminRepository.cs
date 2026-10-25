@@ -56,12 +56,15 @@ public class UserAdminRepository(AppDbContext db, TimeProvider clock) : IUserAdm
                 .SetProperty(u => u.UpdatedAt, now), ct);
         }, ct);
 
+    // Advisory lock key for admin changes; keep it unique among this app's advisory locks.
+    const string AdminChangeLock = "SELECT pg_advisory_xact_lock(21)";
+
     // The advisory lock serialises admin changes: under READ COMMITTED two concurrent guarded UPDATEs on
     // different rows would each see the other admin as still active and both succeed.
     async Task<UserChange> ApplyAsync(Guid id, bool removesAdmin, Func<IQueryable<User>, Task<int>> update, CancellationToken ct)
     {
         await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(21)", ct);
+        await db.Database.ExecuteSqlRawAsync(AdminChangeLock, ct);
 
         var rows = await update(db.Users.Where(u => u.Id == id &&
             (!removesAdmin || !(u.IsActive && u.Role == UserRole.Admin) ||
