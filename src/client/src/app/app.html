@@ -1,11 +1,14 @@
 <mat-toolbar class="toolbar">
   <a routerLink="/" class="brand">Stack Track</a>
   <span class="spacer"></span>
-  <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="User menu">
-    <mat-icon>account_circle</mat-icon>
-  </button>
-  <mat-menu #userMenu="matMenu">
-    <button mat-menu-item disabled>Sign in (coming soon)</button>
-  </mat-menu>
+  @if (user(); as user) {
+    <span class="user">
+      <span class="avatar" aria-hidden="true">{{ user.displayName.charAt(0).toUpperCase() }}</span>
+      {{ user.displayName }}
+    </span>
+    <button mat-button class="sign-out" type="button" (click)="signOut()">Sign out</button>
+  } @else {
+    <a mat-button routerLink="/auth/sign-up">Sign up</a>
+  }
 </mat-toolbar>
 <main><router-outlet /></main>

@@ -15,6 +15,24 @@
   flex: 1;
 }
 
+.user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: var(--mat-sys-label-large);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mat-sys-tertiary-container);
+  color: var(--mat-sys-on-tertiary-container);
+  font-weight: 600;
+}
+
 main {
   max-width: 1200px;
   margin: 0 auto;
