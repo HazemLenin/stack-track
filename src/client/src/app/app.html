@@ -2,11 +2,13 @@
   <a routerLink="/" class="brand">Stack Track</a>
   <span class="spacer"></span>
   @if (user(); as user) {
-    <span class="user">
+    <button mat-button type="button" class="user" [matMenuTriggerFor]="menu">
       <span class="avatar" aria-hidden="true">{{ user.displayName.charAt(0).toUpperCase() }}</span>
       {{ user.displayName }}
-    </span>
-    <button mat-button class="sign-out" type="button" (click)="signOut()">Sign out</button>
+    </button>
+    <mat-menu #menu="matMenu">
+      <button mat-menu-item type="button" class="sign-out" (click)="signOut()">Sign out</button>
+    </mat-menu>
   } @else {
     <a mat-button routerLink="/auth/sign-in">Sign in</a>
   }
