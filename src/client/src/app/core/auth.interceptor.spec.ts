@@ -71,7 +71,7 @@ describe('authInterceptor', () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it('signs out and goes to sign in with the return URL when refresh fails', async () => {
+  it('redirects with reason=expired when refresh fails', async () => {
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     vi.spyOn(router, 'url', 'get').mockReturnValue('/boards/42');
     refresh.mockReturnValue(throwError(() => ({ status: 401 })));
@@ -81,7 +81,9 @@ describe('authInterceptor', () => {
     http.expectOne('/api/boards').flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(error?.status).toBe(401);
-    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in'], { queryParams: { returnUrl: '/boards/42' } });
+    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in'], {
+      queryParams: { returnUrl: '/boards/42', reason: 'expired' },
+    });
   });
 
   it('does not refresh when a retried request fails for another reason', () => {

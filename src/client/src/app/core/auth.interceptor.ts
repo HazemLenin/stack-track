@@ -24,7 +24,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       // Access token expired: refresh once and replay. If the refresh itself fails the session is over.
       return auth.refresh().pipe(
         catchError(() => {
-          router.navigate(['/auth/sign-in'], { queryParams: { returnUrl: router.url } });
+          router.navigate(['/auth/sign-in'], { queryParams: { returnUrl: router.url, reason: 'expired' } });
           return throwError(() => error);
         }),
         switchMap((response) => next(withToken(response.accessToken))),

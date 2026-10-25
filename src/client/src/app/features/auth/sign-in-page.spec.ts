@@ -33,7 +33,7 @@ describe('SignInPage', () => {
     await fixture.whenStable();
   }
 
-  async function setup(returnUrl: string | null = null) {
+  async function setup(returnUrl: string | null = null, reason: string | null = null) {
     await TestBed.configureTestingModule({
       imports: [SignInPage],
       providers: [
@@ -42,7 +42,11 @@ describe('SignInPage', () => {
         provideRouter([]),
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { queryParamMap: convertToParamMap(returnUrl ? { returnUrl } : {}) } },
+          useValue: {
+            snapshot: {
+              queryParamMap: convertToParamMap({ ...(returnUrl && { returnUrl }), ...(reason && { reason }) }),
+            },
+          },
         },
       ],
     }).compileComponents();
@@ -146,7 +150,19 @@ describe('SignInPage', () => {
     http.expectOne('/api/auth/sign-in');
   });
 
-  it('links to sign up', async () => {
+  it('shows the expired session message when sent here with reason=expired', async () => {
+    await setup(null, 'expired');
+
+    expect(banner()).toBe('Your session has expired, please sign in again');
+  });
+
+  it('shows no message without a reason', async () => {
+    await setup();
+
+    expect(banner()).toBeUndefined();
+  });
+
+  it('links to sign up',async () => {
     await setup();
     expect(el.querySelector('a[href="/auth/sign-up"]')).toBeTruthy();
   });
