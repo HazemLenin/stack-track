@@ -113,3 +113,55 @@ erDiagram
         datetime UpdatedAt
     }
 ```
+
+## Relationships and delete behavior
+
+Every foreign key is `NOT NULL` except `RefreshToken.ReplacedByTokenId`. "On delete" is what happens to the child rows when the parent row is deleted.
+
+| Relationship | Cardinality | On delete of parent |
+|---|---|---|
+| User -> Board (owner) | 1:N | RESTRICT |
+| Board -> BoardMember | 1:N | CASCADE |
+| User -> BoardMember | 1:N | RESTRICT |
+| Board -> List | 1:N | CASCADE |
+| List -> Card | 1:N | CASCADE |
+| Board -> Label | 1:N | CASCADE |
+| Card -> CardAssignee | 1:N | CASCADE |
+| User -> CardAssignee | 1:N | RESTRICT |
+| Card -> CardLabel | 1:N | CASCADE |
+| Label -> CardLabel | 1:N | CASCADE |
+| Card -> Comment | 1:N | CASCADE |
+| User -> Comment (author) | 1:N | RESTRICT |
+| User -> RefreshToken | 1:N | RESTRICT |
+| RefreshToken -> RefreshToken (replaced by) | 1:0..1 | SET NULL |
+
+### Deleting a board
+
+Deleting a board removes its lists, cards, labels, comments and memberships in one statement, via the cascades above:
+
+- its lists, and through them their cards, and through those the cards' comments, assignees and label links
+- its labels
+- its memberships
+
+No cascade targets `User`. Every foreign key that points at `User` is RESTRICT, so deleting a board can never delete users.
+
+### Users are never deleted
+
+Deleting a user is not supported. A user who leaves is deactivated (`User.IsActive = false`): they cannot sign in and their refresh tokens are revoked, but their boards, comments and assignments stay intact. The RESTRICT on every `User` foreign key makes an accidental delete fail instead of silently losing history.
+
+## Unique constraints
+
+| Constraint | Columns | Rule |
+|---|---|---|
+| User email | `User.Email` | Unique. Stored lowercased, so uniqueness is case-insensitive. |
+| One membership per user per board | `BoardMember (BoardId, UserId)` | Unique pair. |
+| Label name per board | `Label (BoardId, lower(Name))` | Unique per board, case-insensitive. Two boards may reuse a name. |
+| One assignment per user per card | `CardAssignee (CardId, UserId)` | Unique pair. |
+| Card label | `CardLabel (CardId, LabelId)` | Unique pair, a label is applied to a card once. |
+| Refresh token | `RefreshToken.TokenHash` | Unique. Only the hash is stored, never the token. |
+
+## Rules enforced in the application, not the database
+
+- A card assignee must be a member of the card's board.
+- A card's label must belong to the card's board.
+- The board owner is added as a `BoardMember` when the board is created.
