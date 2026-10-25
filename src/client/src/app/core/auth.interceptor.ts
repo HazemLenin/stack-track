@@ -17,6 +17,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
   const isAuthCall = req.url.startsWith(`${baseUrl}/auth/`);
 
+  // Only a lost session is "expired"; someone who never signed in just goes to sign in.
+  const hadSession = auth.accessToken() !== null;
+
   return next(withToken(auth.accessToken())).pipe(
     catchError((error: HttpErrorResponse) => {
       if (error.status !== 401 || isAuthCall) return throwError(() => error);
@@ -24,7 +27,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       // Access token expired: refresh once and replay. If the refresh itself fails the session is over.
       return auth.refresh().pipe(
         catchError(() => {
-          router.navigate(['/auth/sign-in'], { queryParams: { returnUrl: router.url, reason: 'expired' } });
+          router.navigate(['/auth/sign-in'], {
+            queryParams: hadSession ? { returnUrl: router.url, reason: 'expired' } : { returnUrl: router.url },
+          });
           return throwError(() => error);
         }),
         switchMap((response) => next(withToken(response.accessToken))),
