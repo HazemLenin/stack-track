@@ -32,6 +32,8 @@
 7. **Lockout race:** `ponytail:` count increment is read-modify-write on the user row; two parallel wrong guesses can undercount by one. Upgrade to an atomic `ExecuteUpdate` if it matters.
 8. **Client refresh:** the access token is held in memory only (KAN-16 Decision 7). On a 401 from a non-auth request, the interceptor calls refresh once (cookie) and replays; on failure it clears the session and goes to sign-in with the return URL. Concurrent 401s share one refresh call. The startup `restore()` runs before the auth guard, so a reload on a protected page stays on it when the cookie is valid.
 
+9. **Carried over from KAN-16:** `AuthService.restore()` (app initializer calling refresh), the refresh endpoint at `POST /auth/refresh` (unprefixed, see KAN-16 Decision 11), and the "Already have an account? Sign in" link on the sign-up page.
+
 ## AC map
 
 | AC | Task | Test |
