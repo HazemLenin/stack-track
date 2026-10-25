@@ -1,0 +1,26 @@
+.toolbar {
+  background: var(--mat-sys-surface);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.brand {
+  color: var(--mat-sys-primary);
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.spacer {
+  flex: 1;
+}
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+
+  @media (min-width: 720px) {
+    padding: 24px;
+  }
+}

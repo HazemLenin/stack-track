@@ -1,0 +1,11 @@
+<mat-toolbar class="toolbar">
+  <a routerLink="/" class="brand">Stack Track</a>
+  <span class="spacer"></span>
+  <button mat-icon-button [matMenuTriggerFor]="userMenu" aria-label="User menu">
+    <mat-icon>account_circle</mat-icon>
+  </button>
+  <mat-menu #userMenu="matMenu">
+    <button mat-menu-item disabled>Sign in (coming soon)</button>
+  </mat-menu>
+</mat-toolbar>
+<main><router-outlet /></main>
