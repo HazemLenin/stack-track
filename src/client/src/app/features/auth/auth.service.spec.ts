@@ -165,6 +165,24 @@ describe('AuthService', () => {
     http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
   });
 
+  it('does not refresh while the sign out request is pending', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+
+    service.signOut().subscribe();
+    const signOut = http.expectOne('/api/auth/sign-out');
+    const failed = vi.fn();
+    service.refresh().subscribe({ error: failed });
+
+    http.expectNone('/api/auth/refresh');
+    expect(failed).toHaveBeenCalled();
+    expect(service.user()).toBeNull();
+
+    signOut.flush(null, { status: 204, statusText: 'No Content' });
+    service.refresh().subscribe({ error: () => undefined });
+    http.expectOne('/api/auth/refresh');
+  });
+
   it('a refresh refused after the user signed out is not reported as an expired session', () => {
     service.register(request).subscribe();
     http.expectOne('/api/auth/register').flush(response);
