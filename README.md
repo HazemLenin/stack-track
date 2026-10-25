@@ -16,7 +16,22 @@ Trello-style task tracker. Monorepo with a .NET 10 API and an Angular 21 client.
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js](https://nodejs.org/) (current LTS) and npm
 - [Docker](https://www.docker.com/) (API integration tests use Testcontainers with real PostgreSQL)
-- PostgreSQL (when running the API outside tests)
+
+## Getting started
+
+No manual PostgreSQL install needed. Docker Compose runs it.
+
+```bash
+docker compose up -d --wait        # Postgres 18 on 127.0.0.1:5432, waits until healthy
+dotnet run --project src/api/StackTrack.Api --launch-profile http
+curl -i http://localhost:5009/health   # 200 {"status":"Healthy","checks":{"database":"Healthy"}}
+```
+
+- The database (`stacktrack`) is created by the container on first start. No manual DB step.
+- Data lives in the named volume `stacktrack-db`. `docker compose stop` / `start` keeps it; `docker compose down -v` wipes it.
+- `/health` returns `503` with `database: Unhealthy` while Postgres is stopped.
+- Defaults (`stacktrack` / `stacktrack`) are local-only. To override, copy `.env.example` to `.env` (gitignored). The API reads `ConnectionStrings:Default` from `appsettings.Development.json`; override it with the `ConnectionStrings__Default` environment variable or `dotnet user-secrets`. Never commit real credentials.
+- Upgrading from the old Postgres 17 volume: run `docker compose down -v` once, which destroys local data (Postgres 18 uses a different data layout).
 
 ## How to run
 
