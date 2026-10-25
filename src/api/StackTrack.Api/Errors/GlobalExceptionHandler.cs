@@ -45,6 +45,15 @@ public class GlobalExceptionHandler(
                 };
                 break;
 
+            case ForbiddenException forbidden:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status403Forbidden,
+                    Title = "Forbidden",
+                    Detail = forbidden.Message,
+                };
+                break;
+
             case InvalidCredentialsException invalid:
                 problem = new ProblemDetails
                 {
