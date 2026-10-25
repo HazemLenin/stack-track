@@ -13,7 +13,7 @@ const refreshed: AuthResponse = {
 };
 
 describe('authInterceptor', () => {
-  const state = { token: null as string | null };
+  const state = { token: null as string | null, expired: false };
   const refresh = vi.fn();
   let http: HttpTestingController;
   let client: HttpClient;
@@ -21,13 +21,14 @@ describe('authInterceptor', () => {
 
   beforeEach(() => {
     state.token = null;
+    state.expired = false;
     refresh.mockReset();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: AuthService, useValue: { accessToken: () => state.token, refresh } },
+        { provide: AuthService, useValue: { accessToken: () => state.token, sessionExpired: () => state.expired, refresh } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -95,7 +96,7 @@ describe('authInterceptor', () => {
   });
 
   it('redirects with reason=expired when refresh fails', async () => {
-    state.token = 'jwt-1';
+    state.expired = true;
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     vi.spyOn(router, 'url', 'get').mockReturnValue('/boards/42');
     refresh.mockReturnValue(throwError(() => ({ status: 401 })));

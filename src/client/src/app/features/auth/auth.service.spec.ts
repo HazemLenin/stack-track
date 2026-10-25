@@ -23,9 +23,18 @@ describe('AuthService', () => {
   let http: HttpTestingController;
   // Node 26 shadows jsdom's localStorage with an unusable stub, so tests bring their own.
   const store = new Map<string, string>();
+  const session = new Map<string, string>();
+
+  afterEach(() => vi.unstubAllGlobals());
 
   beforeEach(() => {
     store.clear();
+    session.clear();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => session.get(key) ?? null,
+      setItem: (key: string, value: string) => session.set(key, value),
+      removeItem: (key: string) => session.delete(key),
+    });
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => store.get(key) ?? null,
       setItem: (key: string, value: string) => store.set(key, value),
@@ -58,6 +67,7 @@ describe('AuthService', () => {
     http.expectOne('/api/auth/register').flush(response);
 
     expect([...store.keys()]).toEqual([FLAG]);
+    expect(session.size).toBe(0);
     expect(JSON.stringify([...store])).not.toContain('jwt-1');
   });
 

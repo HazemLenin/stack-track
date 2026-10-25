@@ -40,7 +40,8 @@
 
 - Infrastructure: `Auth/TokenService.cs`
 - Tests: `Api.Tests/Auth/RefreshEndpointTests.cs`
-- Client: `core/auth.interceptor.ts` (+ spec), `features/auth/sign-in-page.ts` (+ spec)
+- Client: `core/auth.interceptor.ts`, `core/auth.guard.ts`, `features/auth/auth.service.ts`, `features/auth/sign-in-page.ts` (+ their specs, and the `AuthService` mock in `app.routes.spec.ts`)
+- Known limit: signing out in one tab clears the shared flag, so another open tab that later loses its session shows no message
 
 ## Tasks
 
