@@ -24,7 +24,7 @@
 
 1. **User menu (your answer):** replace the avatar/name span and the "Sign out" button with one button (avatar + display name) opening a `MatMenu` whose item "Sign out" calls `signOut()`. No new package.
 2. **History (your answer):** keep `navigateByUrl('/auth/sign-in')` (push). Back goes to `/boards`, where `authGuard` redirects to sign-in. Proven by a router test, not a code change.
-3. **No API change expected:** if Task 1 tests pass on first run they are regression guards, which is the point. Fix `TokenService` only if one fails.
+3. **No API change expected (client service changed after review, see Files):** if Task 1 tests pass on first run they are regression guards, which is the point. Fix `TokenService` only if one fails.
 4. **Sign-out does not set `sessionExpired`:** unchanged, so the redirect shows no expired message.
 
 ## AC map
@@ -42,7 +42,8 @@
 ## Files
 
 - Tests: `Api.Tests/Auth/RefreshEndpointTests.cs`
-- Client: `app.html`, `app.ts`, `app.scss` (menu trigger style), `app.spec.ts`, `features/auth/auth.service.spec.ts`
+- Client: `app.html`, `app.ts`, `app.spec.ts`, `app.routes.spec.ts`, `features/auth/auth.service.ts` and its spec
+- Added after review: `AuthService.signOut()` clears the session at once, waits (max 5s) for an in-flight refresh so the rotated cookie is the one revoked, and refreshes from before a sign out never touch a later session (generation counter)
 
 ## Tasks
 

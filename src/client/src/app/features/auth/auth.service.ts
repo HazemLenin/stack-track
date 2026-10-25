@@ -59,13 +59,13 @@ export class AuthService {
   register(request: RegisterRequest): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.baseUrl}/auth/register`, request)
-      .pipe(tap((response) => this.start(response)));
+      .pipe(tap((response) => this.begin(response)));
   }
 
   signIn(email: string, password: string): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.baseUrl}/auth/sign-in`, { email, password })
-      .pipe(tap((response) => this.start(response)));
+      .pipe(tap((response) => this.begin(response)));
   }
 
   // Trades the HttpOnly refresh cookie for a new access token. Concurrent callers share one request,
@@ -74,14 +74,17 @@ export class AuthService {
     if (this.refreshing) return this.refreshing;
     const generation = this.generation;
     const shared: Observable<AuthResponse> = this.http.post<AuthResponse>(`${this.baseUrl}/auth/refresh`, null).pipe(
+      timeout(15000), // a hung request must not make every later refresh() reuse it
       tap((response) => {
         if (generation !== this.generation) throw new Error('signed out during refresh');
         this.start(response);
       }),
       catchError((error: HttpErrorResponse) => {
+        // A refresh from before a sign out is stale: it must not touch the session or flag of whoever signed in since.
+        if (generation !== this.generation) return throwError(() => error);
         this.session.set(null);
         // Refused (401) after someone had signed in: the session ran out, which is not the same as never signing in.
-        if (error.status === 401 && generation === this.generation && this.signedBefore()) {
+        if (error.status === 401 && this.signedBefore()) {
           this.sessionExpired.set(true);
           this.setSignedBefore(false);
         }
@@ -114,6 +117,12 @@ export class AuthService {
     // ponytail: waits at most 5s for a hung refresh, then revokes whatever cookie the browser holds
     const settled = this.refreshing?.pipe(timeout(5000), catchError(() => EMPTY), ignoreElements()) ?? EMPTY;
     return concat(settled, this.http.post<void>(`${this.baseUrl}/auth/sign-out`, null));
+  }
+
+  // A fresh sign in or registration: any refresh still shared from an earlier session is not reused.
+  private begin(response: AuthResponse): void {
+    this.refreshing = null;
+    this.start(response);
   }
 
   private start(response: AuthResponse): void {

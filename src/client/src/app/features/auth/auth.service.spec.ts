@@ -146,6 +146,25 @@ describe('AuthService', () => {
     expect(localStorage.getItem(FLAG)).toBeNull();
   });
 
+  it('a refresh from before sign out neither wipes nor serves a session started after it', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+    service.refresh().subscribe({ error: () => undefined });
+    const stale = http.expectOne('/api/auth/refresh');
+    service.signOut().subscribe();
+
+    service.signIn('sara@example.com', 'Valid1234').subscribe();
+    http.expectOne('/api/auth/sign-in').flush({ ...response, accessToken: 'jwt-2' });
+    service.refresh().subscribe();
+    const fresh = http.expectOne('/api/auth/refresh');
+    stale.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(service.accessToken()).toBe('jwt-2');
+    fresh.flush({ ...response, accessToken: 'jwt-3' });
+    expect(service.accessToken()).toBe('jwt-3');
+    http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+  });
+
   it('a refresh refused after the user signed out is not reported as an expired session', () => {
     service.register(request).subscribe();
     http.expectOne('/api/auth/register').flush(response);
