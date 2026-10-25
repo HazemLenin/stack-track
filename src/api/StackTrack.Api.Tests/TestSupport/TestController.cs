@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StackTrack.Application.Errors;
 
 namespace StackTrack.Api.Tests.TestSupport;
 
@@ -31,6 +32,12 @@ public class TestController(ISender sender) : ControllerBase
 {
     [HttpPost("validate")]
     public async Task<ActionResult<string>> Validate(ValidateCommand command) => await sender.Send(command);
+
+    [HttpGet("no-access")]
+    public IActionResult NoAccess() => throw new NotFoundException("The board was not found.");
+
+    [HttpGet("read-only")]
+    public IActionResult ReadOnly() => throw new ForbiddenException("This board is read only for you.");
 
     [HttpGet("boom")]
     public IActionResult Boom() => throw new InvalidOperationException("secret detail");
