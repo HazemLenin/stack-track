@@ -11,6 +11,7 @@ import {
   shareReplay,
   tap,
   throwError,
+  timeout,
 } from 'rxjs';
 import { API_BASE_URL } from '../../core/api-base-url';
 
@@ -105,17 +106,14 @@ export class AuthService {
   }
 
   signOut(): Observable<void> {
+    // Signed out locally at once, whatever the API does. A refresh already in flight is kept (late callers reuse it
+    // and its result is dropped) and awaited, so the request revokes the cookie that refresh rotated to.
     this.generation++;
-    // Let a refresh already in flight finish first, so sign out revokes the cookie it rotated to.
-    const settled = this.refreshing?.pipe(catchError(() => EMPTY), ignoreElements()) ?? EMPTY;
-    this.refreshing = null;
-    return concat(settled, this.http.post<void>(`${this.baseUrl}/auth/sign-out`, null))
-      .pipe(
-        finalize(() => {
-          this.session.set(null);
-          this.setSignedBefore(false);
-        }),
-      );
+    this.session.set(null);
+    this.setSignedBefore(false);
+    // ponytail: waits at most 5s for a hung refresh, then revokes whatever cookie the browser holds
+    const settled = this.refreshing?.pipe(timeout(5000), catchError(() => EMPTY), ignoreElements()) ?? EMPTY;
+    return concat(settled, this.http.post<void>(`${this.baseUrl}/auth/sign-out`, null));
   }
 
   private start(response: AuthResponse): void {

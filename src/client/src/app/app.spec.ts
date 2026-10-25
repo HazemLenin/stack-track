@@ -63,7 +63,7 @@ describe('App', () => {
     await fixture.whenStable();
     (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button.user')!.click();
     await fixture.whenStable();
-    document.querySelector<HTMLButtonElement>('button.sign-out')!.click();
+    document.querySelector<HTMLButtonElement>('.cdk-overlay-container button.sign-out')!.click();
     return fixture;
   }
 

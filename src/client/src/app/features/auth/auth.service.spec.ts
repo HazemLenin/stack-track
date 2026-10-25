@@ -133,8 +133,12 @@ describe('AuthService', () => {
     service.refresh().subscribe({ error: () => undefined });
     const refresh = http.expectOne('/api/auth/refresh');
     service.signOut().subscribe();
-    // Sign out waits for the refresh, so it revokes the cookie the refresh just rotated to.
+    // Signed out locally at once; the request waits for the refresh so it revokes the cookie that refresh rotated to.
+    expect(service.user()).toBeNull();
     http.expectNone('/api/auth/sign-out');
+    // A refresh asked for while sign out is pending reuses the stale one: no second POST to the rotating cookie.
+    service.refresh().subscribe({ error: () => undefined });
+    http.expectNone('/api/auth/refresh');
     refresh.flush(response);
     http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
 
