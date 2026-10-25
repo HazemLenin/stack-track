@@ -1,0 +1,60 @@
+<section class="stage">
+  <form class="card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <h1>Create your account</h1>
+    <p class="sub">Start organizing your work in a few seconds.</p>
+
+    <mat-form-field appearance="fill">
+      <mat-label>Display name</mat-label>
+      <input matInput id="display-name" formControlName="displayName" autocomplete="name" />
+      @if (form.controls.displayName.invalid) {
+        <mat-error>Use 2 to 50 characters</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="fill">
+      <mat-label>Email</mat-label>
+      <input matInput id="email" type="email" formControlName="email" autocomplete="email" />
+      @if (form.controls.email.hasError('taken')) {
+        <mat-error>An account with this email already exists</mat-error>
+      } @else if (form.controls.email.invalid) {
+        <mat-error>Enter a valid email address</mat-error>
+      }
+    </mat-form-field>
+
+    <div class="password">
+      <mat-form-field appearance="fill">
+        <mat-label>Password</mat-label>
+        <input
+          matInput
+          id="password"
+          type="password"
+          formControlName="password"
+          autocomplete="new-password"
+        />
+      </mat-form-field>
+      <ul class="rules" aria-label="Password requirements">
+        @for (rule of rules(); track rule.id) {
+          <li [attr.data-rule]="rule.id" [class.ok]="rule.met" [class.fail]="typing() && !rule.met">
+            {{ rule.label }}
+          </li>
+        }
+      </ul>
+    </div>
+
+    <mat-form-field appearance="fill">
+      <mat-label>Confirm password</mat-label>
+      <input
+        matInput
+        id="confirm-password"
+        type="password"
+        formControlName="confirmPassword"
+        autocomplete="new-password"
+      />
+      @if (form.controls.confirmPassword.invalid) {
+        <mat-error>Passwords do not match</mat-error>
+      }
+    </mat-form-field>
+
+    <button mat-flat-button type="submit" [disabled]="pending()">Create account</button>
+  </form>
+</section>

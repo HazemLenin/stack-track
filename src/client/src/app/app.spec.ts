@@ -1,34 +1,74 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
-import { MatMenuHarness } from '@angular/material/menu/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
+import { AuthService } from './features/auth/auth.service';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideRouter([])],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
   });
 
-  it('renders toolbar, user menu button and router outlet', async () => {
+  const text = (el: HTMLElement) => el.querySelector('mat-toolbar')?.textContent ?? '';
+
+  function signIn() {
+    TestBed.inject(AuthService)
+      .register({ displayName: 'Sara Ahmed', email: 's@x.com', password: 'Valid1234', confirmPassword: 'Valid1234' })
+      .subscribe();
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/auth/register')
+      .flush({
+        accessToken: 'jwt',
+        accessTokenExpiresAt: '2026-10-25T12:15:00Z',
+        user: { id: '1', email: 's@x.com', displayName: 'Sara Ahmed', role: 'Member' },
+      });
+  }
+
+  it('renders the brand and router outlet', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('mat-toolbar')?.textContent).toContain('Stack Track');
-    expect(el.querySelector('button[aria-label="User menu"]')).toBeTruthy();
+
+    expect(text(el)).toContain('Stack Track');
     expect(el.querySelector('main router-outlet')).toBeTruthy();
   });
 
-  it('shows a disabled sign in item in the user menu', async () => {
+  it('offers sign up and hides the user name when signed out', async () => {
     const fixture = TestBed.createComponent(App);
-    const loader = TestbedHarnessEnvironment.loader(fixture);
-    const menu = await loader.getHarness(MatMenuHarness);
-    await menu.open();
-    const items = await menu.getItems();
-    expect(items.length).toBe(1);
-    expect(await items[0].getText()).toContain('Sign in (coming soon)');
-    expect(await items[0].isDisabled()).toBe(true);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('a[href="/auth/sign-up"]')).toBeTruthy();
+    expect(el.querySelector('.user')).toBeNull();
+    expect(text(el)).not.toContain('Sign out');
+  });
+
+  it('shows the display name and a sign out button when signed in', async () => {
+    const fixture = TestBed.createComponent(App);
+    signIn();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('.user')?.textContent).toContain('Sara Ahmed');
+    expect(text(el)).toContain('Sign out');
+    expect(el.querySelector('a[href="/auth/sign-up"]')).toBeNull();
+  });
+
+  it('signs out through the API and returns to sign up', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(App);
+    signIn();
+    await fixture.whenStable();
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button.sign-out')!.click();
+    TestBed.inject(HttpTestingController).expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+    await fixture.whenStable();
+
+    expect(TestBed.inject(AuthService).user()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/auth/sign-up');
   });
 });

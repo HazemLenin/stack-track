@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using StackTrack.Application.Errors;
 
 namespace StackTrack.Api.Errors;
 
@@ -23,6 +24,15 @@ public class GlobalExceptionHandler(
                 {
                     Status = StatusCodes.Status400BadRequest,
                     Title = "One or more validation errors occurred.",
+                };
+                break;
+
+            case ConflictException conflict:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Title = "Conflict",
+                    Detail = conflict.Message,
                 };
                 break;
 
