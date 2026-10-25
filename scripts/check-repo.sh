@@ -20,4 +20,11 @@ done
 grep -q '^root = true' .editorconfig 2>/dev/null || fail ".editorconfig missing or no root = true"
 grep -q 'eol=lf' .gitattributes 2>/dev/null || fail ".gitattributes missing eol=lf"
 
+for h in "Stack Track" "## Prerequisites" "## How to run"; do
+  grep -q "$h" README.md 2>/dev/null || fail "README.md missing: $h"
+done
+for h in "feature/KAN-" "fix/KAN-" "KAN-<n>:" "one ticket = one branch = one PR"; do
+  grep -qi -- "$h" CONTRIBUTING.md 2>/dev/null || fail "CONTRIBUTING.md missing: $h"
+done
+
 [ "$failures" -eq 0 ] && echo "OK" || exit 1
