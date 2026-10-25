@@ -25,6 +25,7 @@ app.UseStatusCodePages();
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -35,6 +36,6 @@ app.MapHealthChecks("/health", new HealthCheckOptions
         status = report.Status.ToString(),
         checks = report.Entries.ToDictionary(e => e.Key, e => e.Value.Status.ToString()),
     }),
-});
+}).AllowAnonymous();
 
 app.Run();

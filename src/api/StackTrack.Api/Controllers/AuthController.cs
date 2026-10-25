@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using StackTrack.Application.Auth;
@@ -11,6 +12,7 @@ using StackTrack.Infrastructure.Auth;
 namespace StackTrack.Api.Controllers;
 
 [ApiController]
+[AllowAnonymous]
 [Route("auth")]
 public class AuthController(ISender sender, IOptions<JwtOptions> jwt) : ControllerBase
 {

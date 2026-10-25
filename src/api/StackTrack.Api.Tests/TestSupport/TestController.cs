@@ -1,5 +1,6 @@
 using FluentValidation;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace StackTrack.Api.Tests.TestSupport;
@@ -24,6 +25,7 @@ public class ValidateCommandHandler : IRequestHandler<ValidateCommand, string>
 }
 
 [ApiController]
+[AllowAnonymous]
 [Route("test")]
 public class TestController(ISender sender) : ControllerBase
 {
