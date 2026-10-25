@@ -9,8 +9,11 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("Default")));
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<AuditInterceptor>();
+        services.AddDbContext<AppDbContext>((sp, options) => options
+            .UseNpgsql(configuration.GetConnectionString("Default"))
+            .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
 
         services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
 
