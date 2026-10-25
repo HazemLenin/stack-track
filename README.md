@@ -20,15 +20,17 @@ Trello-style task tracker. Monorepo with a .NET 10 API and an Angular 21 client.
 
 ## How to run
 
-> The API and client are added by later setup tickets. This section will be completed as they land.
+> The API is scaffolded (KAN-11). The client is added by a later setup ticket.
 
 ```bash
 # API
+docker compose up -d db                       # local PostgreSQL (stacktrack/stacktrack)
 dotnet build src/api
-dotnet run --project src/api/StackTrack.Api
-dotnet test
+dotnet run --project src/api/StackTrack.Api --launch-profile http
+curl -i http://localhost:5009/health          # 200 + {"status":"Healthy",...}
+dotnet test src/api                           # needs Docker running
 
-# Client
+# Client (not added yet)
 cd src/client
 npm install
 npm run start

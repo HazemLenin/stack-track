@@ -4,8 +4,9 @@ Trello-style task tracker. Monorepo: .NET 10 API + Angular 21 client. Jira proje
 
 ## Commands
 - API build: `dotnet build src/api`
-- API tests: `dotnet test` (integration tests need Docker running, they use Testcontainers)
-- Run API: `dotnet run --project src/api/StackTrack.Api`
+- API tests: `dotnet test src/api` (integration tests need Docker running, they use Testcontainers)
+- Local DB: `docker compose up -d db`
+- Run API: `dotnet run --project src/api/StackTrack.Api --launch-profile http` (health: http://localhost:5009/health)
 - Client: `cd src/client && npm run start`
 - Client tests: `cd src/client && npm test`
 - Lint client: `cd src/client && npm run lint`

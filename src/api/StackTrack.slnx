@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="StackTrack.Api.Tests/StackTrack.Api.Tests.csproj" />
+  <Project Path="StackTrack.Api/StackTrack.Api.csproj" />
+  <Project Path="StackTrack.Application.Tests/StackTrack.Application.Tests.csproj" />
+  <Project Path="StackTrack.Application/StackTrack.Application.csproj" />
+  <Project Path="StackTrack.Domain/StackTrack.Domain.csproj" />
+  <Project Path="StackTrack.Infrastructure/StackTrack.Infrastructure.csproj" />
+</Solution>
