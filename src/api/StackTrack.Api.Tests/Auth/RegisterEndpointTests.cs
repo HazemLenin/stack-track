@@ -38,7 +38,7 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var client = factory.CreateApiClient();
         var email = Email();
 
-        var response = await client.PostAsJsonAsync("/api/auth/register", Body(email));
+        var response = await client.PostAsJsonAsync("/auth/register", Body(email));
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var user = await Find(email);
@@ -63,10 +63,10 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var factory = Factory();
         using var client = factory.CreateApiClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/register", Body(Email()));
+        var response = await client.PostAsJsonAsync("/auth/register", Body(Email()));
 
         var cookie = response.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("refresh_token="));
-        cookie.Should().Contain("httponly").And.Contain("secure").And.Contain("samesite=strict").And.Contain("path=/api/auth");
+        cookie.Should().Contain("httponly").And.Contain("secure").And.Contain("samesite=strict").And.Contain("path=/auth");
         cookie.ToLowerInvariant().Should().Contain("expires=");
     }
 
@@ -77,7 +77,7 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var client = factory.CreateApiClient();
         var email = Email();
 
-        var response = await client.PostAsJsonAsync("/api/auth/register", Body(email, role: "Admin"));
+        var response = await client.PostAsJsonAsync("/auth/register", Body(email, role: "Admin"));
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         (await Find(email)).Role.Should().Be(UserRole.Member);
@@ -89,9 +89,9 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var factory = Factory();
         using var client = factory.CreateApiClient();
         var email = Email();
-        await client.PostAsJsonAsync("/api/auth/register", Body(email));
+        await client.PostAsJsonAsync("/auth/register", Body(email));
 
-        var response = await client.PostAsJsonAsync("/api/auth/register", Body(email.ToUpperInvariant()));
+        var response = await client.PostAsJsonAsync("/auth/register", Body(email.ToUpperInvariant()));
 
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await Json(response)).GetProperty("detail").GetString().Should().Be("An account with this email already exists");
@@ -106,7 +106,7 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var client = factory.CreateApiClient();
         var email = Email();
 
-        await client.PostAsJsonAsync("/api/auth/register", Body("  " + email.ToUpperInvariant() + "  "));
+        await client.PostAsJsonAsync("/auth/register", Body("  " + email.ToUpperInvariant() + "  "));
 
         (await Find(email)).Email.Should().Be(email);
     }
@@ -118,7 +118,7 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var client = factory.CreateApiClient();
         var email = Email();
 
-        await client.PostAsJsonAsync("/api/auth/register", Body(email, name: "  Sara  "));
+        await client.PostAsJsonAsync("/auth/register", Body(email, name: "  Sara  "));
 
         (await Find(email)).DisplayName.Should().Be("Sara");
     }
@@ -130,7 +130,7 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var client = factory.CreateApiClient();
         var email = Email();
 
-        await client.PostAsJsonAsync("/api/auth/register", Body(email, password: "Valid1234"));
+        await client.PostAsJsonAsync("/auth/register", Body(email, password: "Valid1234"));
 
         var hash = (await Find(email)).PasswordHash;
         hash.Should().NotBe("Valid1234").And.NotContain("Valid1234");
@@ -145,8 +145,8 @@ public class RegisterEndpointTests(PostgresFixture db)
         var email = Email();
 
         var results = await Task.WhenAll(
-            a.PostAsJsonAsync("/api/auth/register", Body(email)),
-            b.PostAsJsonAsync("/api/auth/register", Body(email)));
+            a.PostAsJsonAsync("/auth/register", Body(email)),
+            b.PostAsJsonAsync("/auth/register", Body(email)));
 
         results.Select(r => r.StatusCode).Should().BeEquivalentTo([HttpStatusCode.Created, HttpStatusCode.Conflict]);
     }
@@ -157,7 +157,7 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var factory = Factory();
         using var client = factory.CreateApiClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/register", Body(Email(), password: "weak", confirm: "other"));
+        var response = await client.PostAsJsonAsync("/auth/register", Body(Email(), password: "weak", confirm: "other"));
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var errors = (await Json(response)).GetProperty("errors");
@@ -171,10 +171,10 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var factory = Factory();
         using var client = factory.CreateApiClient();
         var email = Email();
-        await client.PostAsJsonAsync("/api/auth/register", Body(email));
+        await client.PostAsJsonAsync("/auth/register", Body(email));
         var userId = (await Find(email)).Id;
 
-        var response = await client.PostAsync("/api/auth/sign-out", null);
+        var response = await client.PostAsync("/auth/sign-out", null);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
         response.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("refresh_token=")).Should().Contain("expires=Thu, 01 Jan 1970");
@@ -188,7 +188,7 @@ public class RegisterEndpointTests(PostgresFixture db)
         using var factory = Factory();
         using var client = factory.CreateApiClient();
 
-        var response = await client.PostAsync("/api/auth/sign-out", null);
+        var response = await client.PostAsync("/auth/sign-out", null);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }

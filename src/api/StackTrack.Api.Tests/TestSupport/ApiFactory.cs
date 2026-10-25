@@ -26,6 +26,7 @@ public class ApiFactory(
         builder.UseSetting("Jwt:Secret", JwtSecret);
         builder.UseSetting("Jwt:Issuer", "stacktrack-tests");
         builder.UseSetting("Jwt:Audience", "stacktrack-tests");
+        builder.UseSetting("Jwt:RefreshCookiePath", "/auth");
 
         builder.ConfigureServices(services =>
         {

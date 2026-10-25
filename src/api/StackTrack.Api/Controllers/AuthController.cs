@@ -1,23 +1,24 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using StackTrack.Application.Auth;
 using StackTrack.Application.Auth.Register;
 using StackTrack.Application.Auth.SignOut;
+using StackTrack.Infrastructure.Auth;
 
 namespace StackTrack.Api.Controllers;
 
 [ApiController]
-[Route("api/auth")]
-public class AuthController(ISender sender) : ControllerBase
+[Route("auth")]
+public class AuthController(ISender sender, IOptions<JwtOptions> jwt) : ControllerBase
 {
     public const string RefreshCookie = "refresh_token";
-    const string CookiePath = "/api/auth";
 
     [HttpPost("register")]
     public async Task<ActionResult<AuthResponse>> Register(RegisterCommand command, CancellationToken ct)
     {
         var tokens = await sender.Send(command, ct);
-        SetRefreshCookie(tokens);
+        Response.Cookies.Append(RefreshCookie, tokens.RefreshToken, CookieOptions(tokens.RefreshTokenExpiresAt));
         return StatusCode(StatusCodes.Status201Created, tokens.Response);
     }
 
@@ -25,17 +26,16 @@ public class AuthController(ISender sender) : ControllerBase
     public async Task<IActionResult> SignOut(CancellationToken ct)
     {
         await sender.Send(new SignOutCommand(Request.Cookies[RefreshCookie]), ct);
-        Response.Cookies.Delete(RefreshCookie, new CookieOptions { Path = CookiePath, Secure = true, SameSite = SameSiteMode.Strict, HttpOnly = true });
+        Response.Cookies.Delete(RefreshCookie, CookieOptions(null));
         return NoContent();
     }
 
-    void SetRefreshCookie(IssuedTokens tokens) =>
-        Response.Cookies.Append(RefreshCookie, tokens.RefreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = CookiePath,
-            Expires = tokens.RefreshTokenExpiresAt,
-        });
+    CookieOptions CookieOptions(DateTimeOffset? expires) => new()
+    {
+        HttpOnly = true,
+        Secure = true,
+        SameSite = SameSiteMode.Strict,
+        Path = jwt.Value.RefreshCookiePath,
+        Expires = expires,
+    };
 }
