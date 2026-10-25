@@ -151,6 +151,157 @@ public class UsersEndpointTests(PostgresFixture db)
     {
         using var factory = Factory();
         using var client = ClientFor(factory, "Member");
+        var id = Guid.NewGuid();
+
         (await client.GetAsync("/admin/users")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.PostAsync($"/admin/users/{id}/deactivate", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.PostAsync($"/admin/users/{id}/reactivate", null)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.PutAsJsonAsync($"/admin/users/{id}/role", new { role = "Admin" })).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Deactivate_blocks_sign_in_and_refresh()
+    {
+        var admin = await Seed("Admin", UserRole.Admin);
+        var omar = await Seed("Omar");
+        using var factory = Factory();
+        using var anon = factory.CreateApiClient();
+        var signIn = await anon.PostAsJsonAsync("/auth/sign-in", new { email = omar.Email, password = Password });
+        signIn.StatusCode.Should().Be(HttpStatusCode.OK);
+        var cookie = signIn.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("refresh_token=")).Split(';')[0];
+        using var client = ClientFor(factory, "Admin", admin.Id);
+
+        (await client.PostAsync($"/admin/users/{omar.Id}/deactivate", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await Reload(omar.Id)).IsActive.Should().BeFalse();
+        (await anon.PostAsJsonAsync("/auth/sign-in", new { email = omar.Email, password = Password }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var refresh = new HttpRequestMessage(HttpMethod.Post, "/auth/refresh");
+        refresh.Headers.Add("Cookie", cookie);
+        (await anon.SendAsync(refresh)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        await using var context = db.CreateContext();
+        (await context.RefreshTokens.Where(t => t.UserId == omar.Id && !t.IsRevoked).AnyAsync()).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Deactivate_keeps_owned_boards_and_comments()
+    {
+        var admin = await Seed("Admin", UserRole.Admin);
+        var omar = await Seed("Omar");
+        await using (var context = db.CreateContext())
+        {
+            var board = new Board { OwnerId = omar.Id, Name = "Roadmap" };
+            var list = new BoardList { BoardId = board.Id, Name = "To do" };
+            var card = new Card { ListId = list.Id, Title = "Plan" };
+            context.AddRange(board, list, card, new Comment { CardId = card.Id, AuthorId = omar.Id, Body = "On it" });
+            await context.SaveChangesAsync();
+        }
+        using var factory = Factory();
+        using var client = ClientFor(factory, "Admin", admin.Id);
+
+        (await client.PostAsync($"/admin/users/{omar.Id}/deactivate", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        await using var check = db.CreateContext();
+        (await check.Boards.CountAsync(b => b.OwnerId == omar.Id)).Should().Be(1);
+        (await check.Comments.CountAsync(c => c.AuthorId == omar.Id)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Reactivate_allows_sign_in_with_old_password()
+    {
+        var admin = await Seed("Admin", UserRole.Admin);
+        var omar = await Seed("Omar", active: false);
+        using var factory = Factory();
+        using var anon = factory.CreateApiClient();
+        using var client = ClientFor(factory, "Admin", admin.Id);
+
+        (await client.PostAsync($"/admin/users/{omar.Id}/reactivate", null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await Reload(omar.Id)).IsActive.Should().BeTrue();
+        (await anon.PostAsJsonAsync("/auth/sign-in", new { email = omar.Email, password = Password }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Change_role_updates_the_user_and_is_idempotent()
+    {
+        var admin = await Seed("Admin", UserRole.Admin);
+        var omar = await Seed("Omar");
+        using var factory = Factory();
+        using var client = ClientFor(factory, "Admin", admin.Id);
+
+        (await client.PutAsJsonAsync($"/admin/users/{omar.Id}/role", new { role = "Admin" })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await client.PutAsJsonAsync($"/admin/users/{omar.Id}/role", new { role = "Admin" })).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await Reload(omar.Id)).Role.Should().Be(UserRole.Admin);
+        (await client.PutAsJsonAsync($"/admin/users/{omar.Id}/role", new { role = "Owner" })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Unknown_user_returns_404()
+    {
+        var admin = await Seed("Admin", UserRole.Admin);
+        using var factory = Factory();
+        using var client = ClientFor(factory, "Admin", admin.Id);
+        var id = Guid.NewGuid();
+
+        (await client.PostAsync($"/admin/users/{id}/deactivate", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PostAsync($"/admin/users/{id}/reactivate", null)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await client.PutAsJsonAsync($"/admin/users/{id}/role", new { role = "Member" })).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Self_deactivate_and_role_change_return_400()
+    {
+        var admin = await Seed("Admin", UserRole.Admin);
+        using var factory = Factory();
+        using var client = ClientFor(factory, "Admin", admin.Id);
+
+        var deactivate = await client.PostAsync($"/admin/users/{admin.Id}/deactivate", null);
+        var role = await client.PutAsJsonAsync($"/admin/users/{admin.Id}/role", new { role = "Member" });
+
+        deactivate.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        role.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Json(deactivate)).GetProperty("errors").TryGetProperty("Id", out _).Should().BeTrue();
+        var after = await Reload(admin.Id);
+        after.IsActive.Should().BeTrue();
+        after.Role.Should().Be(UserRole.Admin);
+    }
+
+    [Fact]
+    public async Task Last_active_admin_cannot_be_deactivated_or_demoted()
+    {
+        var sole = await SoleAdmin();
+        var caller = await Seed("Deactivated Admin", UserRole.Admin, active: false);
+        using var factory = Factory();
+        using var client = ClientFor(factory, "Admin", caller.Id);
+
+        var deactivate = await client.PostAsync($"/admin/users/{sole.Id}/deactivate", null);
+        var demote = await client.PutAsJsonAsync($"/admin/users/{sole.Id}/role", new { role = "Member" });
+
+        deactivate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        demote.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await Json(demote)).GetProperty("detail").GetString().Should().Be("There must be at least one active administrator");
+        var after = await Reload(sole.Id);
+        after.IsActive.Should().BeTrue();
+        after.Role.Should().Be(UserRole.Admin);
+    }
+
+    [Fact]
+    public async Task Concurrent_demotions_leave_one_admin()
+    {
+        var a = await SoleAdmin();
+        var b = await Seed("Second Admin", UserRole.Admin);
+        using var factory = Factory();
+        using var asA = ClientFor(factory, "Admin", a.Id);
+        using var asB = ClientFor(factory, "Admin", b.Id);
+
+        var results = await Task.WhenAll(
+            asA.PutAsJsonAsync($"/admin/users/{b.Id}/role", new { role = "Member" }),
+            asB.PutAsJsonAsync($"/admin/users/{a.Id}/role", new { role = "Member" }));
+
+        results.Select(r => r.StatusCode).Should().BeEquivalentTo([HttpStatusCode.NoContent, HttpStatusCode.Conflict]);
+        await using var context = db.CreateContext();
+        (await context.Users.CountAsync(u => u.Role == UserRole.Admin && u.IsActive)).Should().Be(1);
     }
 }
