@@ -10,6 +10,7 @@ Trello-style task tracker. Monorepo: .NET 10 API + Angular 21 client. Jira proje
 - Client: `cd src/client && npm run start`
 - Client tests: `cd src/client && npm test`
 - Lint client: `cd src/client && npm run lint`
+- Code index: `codegraph init` (once per clone, builds `.codegraph/`, gitignored). It auto-syncs while Claude Code runs; use `codegraph status` to check and `codegraph sync` if it looks stale. Prefer `codegraph explore "<symbol or question>"` over grep/reading files to locate code
 - EF tooling (once per clone): `dotnet tool restore` (installs `dotnet-ef` from `.config/dotnet-tools.json`)
 - New migration: `dotnet ef migrations add <Name> -p src/api/StackTrack.Infrastructure -s src/api/StackTrack.Api`
 - Apply migrations: `dotnet ef database update -p src/api/StackTrack.Infrastructure -s src/api/StackTrack.Api` (needs the local DB running)
