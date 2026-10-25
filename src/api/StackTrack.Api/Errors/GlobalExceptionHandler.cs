@@ -36,6 +36,15 @@ public class GlobalExceptionHandler(
                 };
                 break;
 
+            case NotFoundException notFound:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status404NotFound,
+                    Title = "Not Found",
+                    Detail = notFound.Message,
+                };
+                break;
+
             case InvalidCredentialsException invalid:
                 problem = new ProblemDetails
                 {

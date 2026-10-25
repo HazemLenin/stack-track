@@ -90,7 +90,7 @@ describe('routes', () => {
       user.set({ ...signedIn, role: 'Admin' });
       await harness.navigateByUrl('/admin');
       expect(url()).toBe('/admin/users');
-      expect(h1()).toBe('admin');
+      expect(h1()).toBe('Users');
     });
 
     it('after sign out, navigating back to /boards redirects to sign in', async () => {

@@ -1,0 +1,28 @@
+h1 {
+  margin: 0 0 16px;
+  font: var(--mat-sys-headline-medium);
+  letter-spacing: -0.02em;
+}
+
+input[type='search'] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  font: inherit;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+}
+
+table {
+  width: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
