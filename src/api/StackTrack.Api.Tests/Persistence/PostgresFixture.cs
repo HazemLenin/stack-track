@@ -20,8 +20,14 @@ public sealed class PostgresFixture : IAsyncLifetime
     {
         await _postgres.StartAsync();
         await using var context = CreateContext();
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.MigrateAsync();
     }
 
     public Task DisposeAsync() => _postgres.DisposeAsync().AsTask();
+}
+
+[CollectionDefinition(Name)]
+public class PostgresCollection : ICollectionFixture<PostgresFixture>
+{
+    public const string Name = "postgres";
 }

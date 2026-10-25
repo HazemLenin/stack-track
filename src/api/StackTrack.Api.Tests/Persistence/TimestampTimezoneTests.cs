@@ -4,7 +4,8 @@ using StackTrack.Domain.Entities;
 
 namespace StackTrack.Api.Tests.Persistence;
 
-public class TimestampTimezoneTests(PostgresFixture db) : IClassFixture<PostgresFixture>
+[Collection(PostgresCollection.Name)]
+public class TimestampTimezoneTests(PostgresFixture db)
 {
     [Fact]
     public async Task NonUtcOffset_roundtrips_same_instant()

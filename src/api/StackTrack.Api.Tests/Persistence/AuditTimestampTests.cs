@@ -3,7 +3,8 @@ using StackTrack.Domain.Entities;
 
 namespace StackTrack.Api.Tests.Persistence;
 
-public class AuditTimestampTests(PostgresFixture db) : IClassFixture<PostgresFixture>
+[Collection(PostgresCollection.Name)]
+public class AuditTimestampTests(PostgresFixture db)
 {
     static readonly DateTimeOffset T0 = new(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
 
