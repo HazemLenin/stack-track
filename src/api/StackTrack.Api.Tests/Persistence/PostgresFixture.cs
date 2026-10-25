@@ -10,9 +10,10 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public string ConnectionString => _postgres.GetConnectionString();
 
-    public AppDbContext CreateContext(string? connectionString = null) =>
+    public AppDbContext CreateContext(TimeProvider? clock = null, string? connectionString = null) =>
         new(new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(connectionString ?? ConnectionString)
+            .AddInterceptors(new AuditInterceptor(clock ?? TimeProvider.System))
             .Options);
 
     public async Task InitializeAsync()
