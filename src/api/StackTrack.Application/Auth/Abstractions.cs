@@ -29,6 +29,11 @@ public interface ITokenService
     // Creates the access token and a stored (hashed) refresh token for the user.
     Task<IssuedTokens> IssueAsync(User user, CancellationToken ct);
 
+    // Swaps a valid refresh token for a new pair and revokes the old one. Returns null when the token is
+    // unknown, expired, revoked, already used, or its user is inactive. Replaying a used token revokes
+    // every token issued after it.
+    Task<IssuedTokens?> RotateAsync(string refreshToken, CancellationToken ct);
+
     // Revokes the refresh token if it exists. Unknown tokens are ignored.
     Task RevokeAsync(string refreshToken, CancellationToken ct);
 }

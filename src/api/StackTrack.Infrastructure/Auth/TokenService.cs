@@ -48,6 +48,55 @@ public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimePro
         return new IssuedTokens(new AuthResponse(accessToken, accessExpires, dto), refreshToken, refreshExpires);
     }
 
+    public async Task<IssuedTokens?> RotateAsync(string refreshToken, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(refreshToken)) return null;
+
+        var now = clock.GetUtcNow();
+        var hash = Hash(refreshToken);
+        var stored = await db.RefreshTokens.AsNoTracking().FirstOrDefaultAsync(t => t.TokenHash == hash, ct);
+        if (stored is null) return null;
+
+        if (stored.IsRevoked)
+        {
+            // A used token is being replayed: treat the whole chain after it as stolen.
+            await RevokeChainAfterAsync(stored, ct);
+            return null;
+        }
+
+        if (stored.ExpiresAt <= now) return null;
+
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == stored.UserId, ct);
+        if (user is null || !user.IsActive) return null;
+
+        // Atomic claim: of two concurrent requests with the same token, only one updates a row.
+        var claimed = await db.RefreshTokens
+            .Where(t => t.Id == stored.Id && !t.IsRevoked)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.IsRevoked, true).SetProperty(t => t.UpdatedAt, now), ct);
+        if (claimed == 0) return null;
+
+        var issued = await IssueAsync(user, ct);
+
+        var newHash = Hash(issued.RefreshToken);
+        var newId = await db.RefreshTokens.Where(t => t.TokenHash == newHash).Select(t => t.Id).SingleAsync(ct);
+        await db.RefreshTokens.Where(t => t.Id == stored.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.ReplacedByTokenId, newId), ct);
+        return issued;
+    }
+
+    async Task RevokeChainAfterAsync(RefreshToken used, CancellationToken ct)
+    {
+        var nextId = used.ReplacedByTokenId;
+        while (nextId is not null)
+        {
+            var next = await db.RefreshTokens.FirstOrDefaultAsync(t => t.Id == nextId, ct);
+            if (next is null) break;
+            next.IsRevoked = true;
+            nextId = next.ReplacedByTokenId;
+        }
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task RevokeAsync(string refreshToken, CancellationToken ct)
     {
         var hash = Hash(refreshToken);

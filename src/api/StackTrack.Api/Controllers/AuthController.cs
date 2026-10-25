@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using StackTrack.Application.Auth;
+using StackTrack.Application.Auth.Refresh;
 using StackTrack.Application.Auth.Register;
 using StackTrack.Application.Auth.SignIn;
 using StackTrack.Application.Auth.SignOut;
@@ -27,6 +28,14 @@ public class AuthController(ISender sender, IOptions<JwtOptions> jwt) : Controll
     public async Task<ActionResult<AuthResponse>> SignIn(SignInCommand command, CancellationToken ct)
     {
         var tokens = await sender.Send(command, ct);
+        Response.Cookies.Append(RefreshCookie, tokens.RefreshToken, CookieOptions(tokens.RefreshTokenExpiresAt));
+        return tokens.Response;
+    }
+
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponse>> Refresh(CancellationToken ct)
+    {
+        var tokens = await sender.Send(new RefreshTokenCommand(Request.Cookies[RefreshCookie] ?? ""), ct);
         Response.Cookies.Append(RefreshCookie, tokens.RefreshToken, CookieOptions(tokens.RefreshTokenExpiresAt));
         return tokens.Response;
     }

@@ -45,6 +45,15 @@ public class GlobalExceptionHandler(
                 };
                 break;
 
+            case InvalidRefreshTokenException expired:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status401Unauthorized,
+                    Title = "Unauthorized",
+                    Detail = expired.Message,
+                };
+                break;
+
             case AccountDeactivatedException deactivated:
                 problem = new ProblemDetails
                 {
