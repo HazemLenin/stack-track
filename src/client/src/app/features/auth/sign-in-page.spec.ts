@@ -162,7 +162,7 @@ describe('SignInPage', () => {
     expect(banner()).toBeUndefined();
   });
 
-  it('links to sign up',async () => {
+  it('links to sign up', async () => {
     await setup();
     expect(el.querySelector('a[href="/auth/sign-up"]')).toBeTruthy();
   });

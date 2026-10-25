@@ -82,6 +82,18 @@ describe('authInterceptor', () => {
     expect(navigate).toHaveBeenCalledWith(['/auth/sign-in'], { queryParams: { returnUrl: '/boards/42' } });
   });
 
+  it('does not claim the session expired when refresh fails for a non-401 reason', () => {
+    state.token = 'jwt-1';
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    vi.spyOn(router, 'url', 'get').mockReturnValue('/boards/42');
+    refresh.mockReturnValue(throwError(() => ({ status: 503 })));
+    client.get('/api/boards').subscribe({ error: () => undefined });
+
+    http.expectOne('/api/boards').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in'], { queryParams: { returnUrl: '/boards/42' } });
+  });
+
   it('redirects with reason=expired when refresh fails', async () => {
     state.token = 'jwt-1';
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
