@@ -1,6 +1,18 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, finalize, firstValueFrom, Observable, shareReplay, tap, throwError } from 'rxjs';
+import {
+  catchError,
+  concat,
+  EMPTY,
+  finalize,
+  firstValueFrom,
+  ignoreElements,
+  Observable,
+  shareReplay,
+  tap,
+  throwError,
+  timeout,
+} from 'rxjs';
 import { API_BASE_URL } from '../../core/api-base-url';
 
 const SIGNED_IN_FLAG = 'stacktrack.signed-in';
@@ -35,6 +47,13 @@ export class AuthService {
 
   private refreshing: Observable<AuthResponse> | null = null;
 
+  // Bumped on sign out so a refresh that was already in flight cannot bring the session back.
+  private generation = 0;
+
+  // True from the sign out click until its request settles: no refresh may bring the session back meanwhile.
+  private signingOut = false;
+  private signOutSeq = 0;
+
   // True once a session that existed (this tab or an earlier visit) was refused by the API.
   readonly sessionExpired = signal(false);
 
@@ -44,21 +63,30 @@ export class AuthService {
   register(request: RegisterRequest): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.baseUrl}/auth/register`, request)
-      .pipe(tap((response) => this.start(response)));
+      .pipe(tap((response) => this.begin(response)));
   }
 
   signIn(email: string, password: string): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.baseUrl}/auth/sign-in`, { email, password })
-      .pipe(tap((response) => this.start(response)));
+      .pipe(tap((response) => this.begin(response)));
   }
 
   // Trades the HttpOnly refresh cookie for a new access token. Concurrent callers share one request,
   // because the API rotates the cookie and a second use of the old one would be treated as theft.
   refresh(): Observable<AuthResponse> {
-    this.refreshing ??= this.http.post<AuthResponse>(`${this.baseUrl}/auth/refresh`, null).pipe(
-      tap((response) => this.start(response)),
+    if (this.signingOut) return throwError(() => new Error('signing out'));
+    if (this.refreshing) return this.refreshing;
+    const generation = this.generation;
+    const shared: Observable<AuthResponse> = this.http.post<AuthResponse>(`${this.baseUrl}/auth/refresh`, null).pipe(
+      timeout(15000), // a hung request must not make every later refresh() reuse it
+      tap((response) => {
+        if (generation !== this.generation) throw new Error('signed out during refresh');
+        this.start(response);
+      }),
       catchError((error: HttpErrorResponse) => {
+        // A refresh from before a sign out is stale: it must not touch the session or flag of whoever signed in since.
+        if (generation !== this.generation) return throwError(() => error);
         this.session.set(null);
         // Refused (401) after someone had signed in: the session ran out, which is not the same as never signing in.
         if (error.status === 401 && this.signedBefore()) {
@@ -67,10 +95,13 @@ export class AuthService {
         }
         return throwError(() => error);
       }),
-      finalize(() => (this.refreshing = null)),
+      finalize(() => {
+        if (this.refreshing === shared) this.refreshing = null;
+      }),
       shareReplay({ bufferSize: 1, refCount: false }),
     );
-    return this.refreshing;
+    this.refreshing = shared;
+    return shared;
   }
 
   // Runs at startup: a valid cookie signs the user back in after a reload. Failure just means signed out.
@@ -83,14 +114,29 @@ export class AuthService {
   }
 
   signOut(): Observable<void> {
-    return this.http
-      .post<void>(`${this.baseUrl}/auth/sign-out`, null)
-      .pipe(
-        finalize(() => {
-          this.session.set(null);
-          this.setSignedBefore(false);
-        }),
-      );
+    // Signed out locally at once, whatever the API does. A refresh already in flight is kept (late callers reuse it
+    // and its result is dropped) and awaited, so the request revokes the cookie that refresh rotated to.
+    this.generation++;
+    this.signingOut = true;
+    const seq = ++this.signOutSeq;
+    this.session.set(null);
+    this.setSignedBefore(false);
+    // ponytail: waits at most 5s for a hung refresh, then revokes whatever cookie the browser holds
+    const settled = this.refreshing?.pipe(timeout(5000), catchError(() => EMPTY), ignoreElements()) ?? EMPTY;
+    return concat(settled, this.http.post<void>(`${this.baseUrl}/auth/sign-out`, null).pipe(timeout(15000))).pipe(
+      finalize(() => {
+        // Only the latest sign out may lift the guard: an earlier one settling late must not.
+        if (seq === this.signOutSeq) this.signingOut = false;
+      }),
+    );
+  }
+
+  // A fresh sign in or registration: any refresh still shared from an earlier session is not reused.
+  private begin(response: AuthResponse): void {
+    this.generation++;
+    this.refreshing = null;
+    this.signingOut = false;
+    this.start(response);
   }
 
   private start(response: AuthResponse): void {

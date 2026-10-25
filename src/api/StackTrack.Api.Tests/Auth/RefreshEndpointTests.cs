@@ -143,6 +143,24 @@ public class RefreshEndpointTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task SignOut_leaves_another_session_signed_in()
+    {
+        using var factory = Factory();
+        using var client = RawClient(factory);
+        var (email, laptop) = await Register(client);
+        var signIn = await client.PostAsJsonAsync("/auth/sign-in", new { email, password = "Valid1234" });
+        signIn.StatusCode.Should().Be(HttpStatusCode.OK);
+        var phone = CookieValue(signIn);
+
+        var signOut = new HttpRequestMessage(HttpMethod.Post, "/auth/sign-out");
+        signOut.Headers.Add("Cookie", $"refresh_token={laptop}");
+        (await client.SendAsync(signOut)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await Refresh(client, laptop)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await Refresh(client, phone)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task Refresh_reuse_revokes_chain()
     {
         using var factory = Factory();

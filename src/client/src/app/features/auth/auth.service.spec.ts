@@ -123,6 +123,105 @@ describe('AuthService', () => {
     req.flush(null, { status: 204, statusText: 'No Content' });
 
     expect(service.user()).toBeNull();
+    expect(localStorage.getItem(FLAG)).toBeNull();
+  });
+
+  it('a refresh still in flight when the user signs out does not bring the session back', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+
+    service.refresh().subscribe({ error: () => undefined });
+    const refresh = http.expectOne('/api/auth/refresh');
+    service.signOut().subscribe();
+    // Signed out locally at once; the request waits for the refresh so it revokes the cookie that refresh rotated to.
+    expect(service.user()).toBeNull();
+    http.expectNone('/api/auth/sign-out');
+    // A refresh asked for while sign out is pending reuses the stale one: no second POST to the rotating cookie.
+    service.refresh().subscribe({ error: () => undefined });
+    http.expectNone('/api/auth/refresh');
+    refresh.flush(response);
+    http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+
+    expect(service.user()).toBeNull();
+    expect(localStorage.getItem(FLAG)).toBeNull();
+  });
+
+  it('a refresh from before sign out neither wipes nor serves a session started after it', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+    service.refresh().subscribe({ error: () => undefined });
+    const stale = http.expectOne('/api/auth/refresh');
+    service.signOut().subscribe();
+
+    service.signIn('sara@example.com', 'Valid1234').subscribe();
+    http.expectOne('/api/auth/sign-in').flush({ ...response, accessToken: 'jwt-2' });
+    service.refresh().subscribe();
+    const fresh = http.expectOne('/api/auth/refresh');
+    stale.flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(service.accessToken()).toBe('jwt-2');
+    fresh.flush({ ...response, accessToken: 'jwt-3' });
+    expect(service.accessToken()).toBe('jwt-3');
+    http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+  });
+
+  it('does not refresh while the sign out request is pending', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+
+    service.signOut().subscribe();
+    const signOut = http.expectOne('/api/auth/sign-out');
+    const failed = vi.fn();
+    service.refresh().subscribe({ error: failed });
+
+    http.expectNone('/api/auth/refresh');
+    expect(failed).toHaveBeenCalled();
+    expect(service.user()).toBeNull();
+
+    signOut.flush(null, { status: 204, statusText: 'No Content' });
+    service.refresh().subscribe({ error: () => undefined });
+    http.expectOne('/api/auth/refresh');
+  });
+
+  it('a refresh in flight when someone signs in does not replace that sign in', () => {
+    service.refresh().subscribe({ error: () => undefined });
+    const stale = http.expectOne('/api/auth/refresh');
+    service.signIn('sara@example.com', 'Valid1234').subscribe();
+    http.expectOne('/api/auth/sign-in').flush({ ...response, accessToken: 'jwt-new' });
+
+    stale.flush({ ...response, accessToken: 'jwt-stale' });
+
+    expect(service.accessToken()).toBe('jwt-new');
+  });
+
+  it('an earlier sign out settling does not unblock the refresh guard of a later one', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+    service.signOut().subscribe();
+    const first = http.expectOne('/api/auth/sign-out');
+    service.signIn('sara@example.com', 'Valid1234').subscribe();
+    http.expectOne('/api/auth/sign-in').flush(response);
+    service.signOut().subscribe();
+    const second = http.expectOne('/api/auth/sign-out');
+
+    first.flush(null, { status: 204, statusText: 'No Content' });
+    service.refresh().subscribe({ error: () => undefined });
+
+    http.expectNone('/api/auth/refresh');
+    second.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
+  it('a refresh refused after the user signed out is not reported as an expired session', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+
+    service.refresh().subscribe({ error: () => undefined });
+    const refresh = http.expectOne('/api/auth/refresh');
+    service.signOut().subscribe();
+    refresh.flush({}, { status: 401, statusText: 'Unauthorized' });
+    http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+
+    expect(service.sessionExpired()).toBe(false);
   });
 
   it('signIn posts the credentials and keeps the session in memory', () => {
