@@ -77,6 +77,34 @@ public class RefreshEndpointTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Refresh_does_not_extend_the_original_seven_day_window()
+    {
+        using var factory = Factory();
+        using var client = RawClient(factory);
+        var (_, first) = await Register(client);
+        _clock.Advance(TimeSpan.FromDays(3));
+
+        var second = CookieValue(await Refresh(client, first));
+
+        (await Stored(second)).ExpiresAt.Should().Be(Start.AddDays(7));
+    }
+
+    [Fact]
+    public async Task Refresh_after_seven_days_returns_401()
+    {
+        using var factory = Factory();
+        using var client = RawClient(factory);
+        var (_, a) = await Register(client);
+        _clock.Advance(TimeSpan.FromDays(3));
+        var b = CookieValue(await Refresh(client, a));
+        _clock.Advance(TimeSpan.FromDays(3));
+        var c = CookieValue(await Refresh(client, b));
+        _clock.Advance(TimeSpan.FromDays(1) + TimeSpan.FromSeconds(1));
+
+        (await Refresh(client, c)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Refresh_without_a_cookie_or_with_an_unknown_token_returns_401()
     {
         using var factory = Factory();
