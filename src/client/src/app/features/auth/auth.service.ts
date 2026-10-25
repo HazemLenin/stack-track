@@ -1,7 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { catchError, finalize, firstValueFrom, Observable, shareReplay, tap, throwError } from 'rxjs';
 import { API_BASE_URL } from '../../core/api-base-url';
+
+const SIGNED_IN_FLAG = 'stacktrack.signed-in';
 
 export interface UserDto {
   id: string;
@@ -33,28 +35,36 @@ export class AuthService {
 
   private refreshing: Observable<AuthResponse> | null = null;
 
+  // True once a session that existed (this tab or an earlier visit) was refused by the API.
+  readonly sessionExpired = signal(false);
+
   readonly user = computed(() => this.session()?.user ?? null);
   readonly accessToken = computed(() => this.session()?.accessToken ?? null);
 
   register(request: RegisterRequest): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.baseUrl}/auth/register`, request)
-      .pipe(tap((response) => this.session.set(response)));
+      .pipe(tap((response) => this.start(response)));
   }
 
   signIn(email: string, password: string): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${this.baseUrl}/auth/sign-in`, { email, password })
-      .pipe(tap((response) => this.session.set(response)));
+      .pipe(tap((response) => this.start(response)));
   }
 
   // Trades the HttpOnly refresh cookie for a new access token. Concurrent callers share one request,
   // because the API rotates the cookie and a second use of the old one would be treated as theft.
   refresh(): Observable<AuthResponse> {
     this.refreshing ??= this.http.post<AuthResponse>(`${this.baseUrl}/auth/refresh`, null).pipe(
-      tap((response) => this.session.set(response)),
-      catchError((error) => {
+      tap((response) => this.start(response)),
+      catchError((error: HttpErrorResponse) => {
         this.session.set(null);
+        // Refused (401) after someone had signed in: the session ran out, which is not the same as never signing in.
+        if (error.status === 401 && this.signedBefore()) {
+          this.sessionExpired.set(true);
+          this.setSignedBefore(false);
+        }
         return throwError(() => error);
       }),
       finalize(() => (this.refreshing = null)),
@@ -75,6 +85,35 @@ export class AuthService {
   signOut(): Observable<void> {
     return this.http
       .post<void>(`${this.baseUrl}/auth/sign-out`, null)
-      .pipe(finalize(() => this.session.set(null)));
+      .pipe(
+        finalize(() => {
+          this.session.set(null);
+          this.setSignedBefore(false);
+        }),
+      );
+  }
+
+  private start(response: AuthResponse): void {
+    this.session.set(response);
+    this.sessionExpired.set(false);
+    this.setSignedBefore(true);
+  }
+
+  // A non-secret flag (no token) so a reopened tab can tell "session ran out" from "never signed in".
+  private signedBefore(): boolean {
+    try {
+      return localStorage.getItem(SIGNED_IN_FLAG) !== null;
+    } catch {
+      return false;
+    }
+  }
+
+  private setSignedBefore(value: boolean): void {
+    try {
+      if (value) localStorage.setItem(SIGNED_IN_FLAG, '1');
+      else localStorage.removeItem(SIGNED_IN_FLAG);
+    } catch {
+      // storage blocked: the message is skipped, nothing else depends on it
+    }
   }
 }

@@ -13,7 +13,7 @@ const refreshed: AuthResponse = {
 };
 
 describe('authInterceptor', () => {
-  const state = { token: null as string | null };
+  const state = { token: null as string | null, expired: false };
   const refresh = vi.fn();
   let http: HttpTestingController;
   let client: HttpClient;
@@ -21,13 +21,14 @@ describe('authInterceptor', () => {
 
   beforeEach(() => {
     state.token = null;
+    state.expired = false;
     refresh.mockReset();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authInterceptor])),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: AuthService, useValue: { accessToken: () => state.token, refresh } },
+        { provide: AuthService, useValue: { accessToken: () => state.token, sessionExpired: () => state.expired, refresh } },
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -71,7 +72,31 @@ describe('authInterceptor', () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it('signs out and goes to sign in with the return URL when refresh fails', async () => {
+  it('does not claim the session expired when nobody was signed in', () => {
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    vi.spyOn(router, 'url', 'get').mockReturnValue('/boards/42');
+    refresh.mockReturnValue(throwError(() => ({ status: 401 })));
+    client.get('/api/boards').subscribe({ error: () => undefined });
+
+    http.expectOne('/api/boards').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in'], { queryParams: { returnUrl: '/boards/42' } });
+  });
+
+  it('does not claim the session expired when refresh fails for a non-401 reason', () => {
+    state.token = 'jwt-1';
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    vi.spyOn(router, 'url', 'get').mockReturnValue('/boards/42');
+    refresh.mockReturnValue(throwError(() => ({ status: 503 })));
+    client.get('/api/boards').subscribe({ error: () => undefined });
+
+    http.expectOne('/api/boards').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in'], { queryParams: { returnUrl: '/boards/42' } });
+  });
+
+  it('redirects with reason=expired when refresh fails', async () => {
+    state.expired = true;
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     vi.spyOn(router, 'url', 'get').mockReturnValue('/boards/42');
     refresh.mockReturnValue(throwError(() => ({ status: 401 })));
@@ -81,7 +106,9 @@ describe('authInterceptor', () => {
     http.expectOne('/api/boards').flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(error?.status).toBe(401);
-    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in'], { queryParams: { returnUrl: '/boards/42' } });
+    expect(navigate).toHaveBeenCalledWith(['/auth/sign-in'], {
+      queryParams: { returnUrl: '/boards/42', reason: 'expired' },
+    });
   });
 
   it('does not refresh when a retried request fails for another reason', () => {
@@ -109,5 +136,29 @@ describe('authInterceptor', () => {
     http.expectOne('https://example.com/x').flush({}, { status: 401, statusText: 'Unauthorized' });
 
     expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('authInterceptor with the real AuthService', () => {
+  it('parallel 401s share one refresh and all succeed', () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(withInterceptors([authInterceptor])), provideHttpClientTesting(), provideRouter([])],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const client = TestBed.inject(HttpClient);
+    const urls = ['/api/a', '/api/b', '/api/c'];
+    const results: unknown[] = [];
+    urls.forEach((url) => client.get(url).subscribe((r) => results.push(r)));
+
+    urls.forEach((url) => http.expectOne(url).flush({}, { status: 401, statusText: 'Unauthorized' }));
+    http.expectOne('/api/auth/refresh').flush(refreshed);
+    urls.forEach((url) => {
+      const retry = http.expectOne(url);
+      expect(retry.request.headers.get('Authorization')).toBe('Bearer jwt-2');
+      retry.flush({ ok: url });
+    });
+
+    expect(results).toHaveLength(3);
+    http.verify();
   });
 });

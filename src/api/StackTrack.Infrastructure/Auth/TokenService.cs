@@ -14,11 +14,13 @@ namespace StackTrack.Infrastructure.Auth;
 
 public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimeProvider clock) : ITokenService
 {
-    static readonly TimeSpan RotationGrace = TimeSpan.FromSeconds(10);
-
     readonly JwtOptions _jwt = options.Value;
 
-    public async Task<IssuedTokens> IssueAsync(User user, CancellationToken ct)
+    public Task<IssuedTokens> IssueAsync(User user, CancellationToken ct) =>
+        IssueAsync(user, clock.GetUtcNow().AddDays(_jwt.RefreshTokenDays), ct);
+
+    // Rotation passes the predecessor's expiry so the window stays fixed from sign in.
+    async Task<IssuedTokens> IssueAsync(User user, DateTimeOffset refreshExpires, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
         var accessExpires = now.AddMinutes(_jwt.AccessTokenMinutes);
@@ -42,7 +44,6 @@ public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimePro
         });
 
         var refreshToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
-        var refreshExpires = now.AddDays(_jwt.RefreshTokenDays);
         db.RefreshTokens.Add(new RefreshToken { UserId = user.Id, TokenHash = Hash(refreshToken), ExpiresAt = refreshExpires });
         await db.SaveChangesAsync(ct);
 
@@ -61,10 +62,6 @@ public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimePro
 
         if (stored.IsRevoked)
         {
-            // Two tabs refreshing together replay a token rotated a moment ago. Fail the slower one
-            // without revoking the winner's new token.
-            if (stored.ReplacedByTokenId is not null && now - stored.UpdatedAt < RotationGrace) return null;
-
             // A used token is being replayed later: treat the whole chain after it as stolen.
             await RevokeChainAfterAsync(stored, ct);
             return null;
@@ -77,7 +74,7 @@ public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimePro
 
         // Insert the successor and revoke the old token in one transaction: either both happen or neither.
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var issued = await IssueAsync(user, ct);
+        var issued = await IssueAsync(user, stored.ExpiresAt, ct);
 
         var newHash = Hash(issued.RefreshToken);
         var newId = await db.RefreshTokens.Where(t => t.TokenHash == newHash).Select(t => t.Id).SingleAsync(ct);

@@ -21,7 +21,7 @@ describe('routes', () => {
         provideRouter(routes),
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: AuthService, useValue: { user, accessToken: () => null } },
+        { provide: AuthService, useValue: { user, accessToken: () => null, sessionExpired: () => false } },
       ],
     });
     harness = await RouterTestingHarness.create();

@@ -9,6 +9,8 @@ const response: AuthResponse = {
   user: { id: '1', email: 'sara@example.com', displayName: 'Sara Ahmed', role: 'Member' },
 };
 
+const FLAG = 'stacktrack.signed-in';
+
 const request = {
   displayName: 'Sara Ahmed',
   email: 'sara@example.com',
@@ -19,8 +21,25 @@ const request = {
 describe('AuthService', () => {
   let service: AuthService;
   let http: HttpTestingController;
+  // Node 26 shadows jsdom's localStorage with an unusable stub, so tests bring their own.
+  const store = new Map<string, string>();
+  const session = new Map<string, string>();
+
+  afterEach(() => vi.unstubAllGlobals());
 
   beforeEach(() => {
+    store.clear();
+    session.clear();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (key: string) => session.get(key) ?? null,
+      setItem: (key: string, value: string) => session.set(key, value),
+      removeItem: (key: string) => session.delete(key),
+    });
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+      removeItem: (key: string) => store.delete(key),
+    });
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     service = TestBed.inject(AuthService);
     http = TestBed.inject(HttpTestingController);
@@ -43,14 +62,48 @@ describe('AuthService', () => {
     expect(service.accessToken()).toBe('jwt-1');
   });
 
-  it('never writes tokens to web storage', () => {
-    const before = JSON.stringify([{ ...localStorage }, { ...sessionStorage }]);
-
+  it('never writes tokens to web storage, only a signed-in flag', () => {
     service.register(request).subscribe();
     http.expectOne('/api/auth/register').flush(response);
 
-    expect(JSON.stringify([{ ...localStorage }, { ...sessionStorage }])).toBe(before);
-    expect(before).not.toContain('jwt-1');
+    expect([...store.keys()]).toEqual([FLAG]);
+    expect(session.size).toBe(0);
+    expect(JSON.stringify([...store])).not.toContain('jwt-1');
+  });
+
+  it('flags the session as expired when refresh is refused after an earlier sign in', () => {
+    store.set(FLAG, '1');
+
+    service.refresh().subscribe({ error: () => undefined });
+    http.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(service.sessionExpired()).toBe(true);
+    expect(store.has(FLAG)).toBe(false);
+  });
+
+  it('does not flag expiry for someone who never signed in', () => {
+    service.refresh().subscribe({ error: () => undefined });
+    http.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(service.sessionExpired()).toBe(false);
+  });
+
+  it('does not flag expiry when refresh fails for a non-401 reason', () => {
+    store.set(FLAG, '1');
+
+    service.refresh().subscribe({ error: () => undefined });
+    http.expectOne('/api/auth/refresh').flush({}, { status: 503, statusText: 'Unavailable' });
+
+    expect(service.sessionExpired()).toBe(false);
+  });
+
+  it('signing out forgets the signed-in flag', () => {
+    store.set(FLAG, '1');
+
+    service.signOut().subscribe();
+    http.expectOne('/api/auth/sign-out').flush(null);
+
+    expect(store.has(FLAG)).toBe(false);
   });
 
   it('failed register leaves the user signed out', () => {

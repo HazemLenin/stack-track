@@ -77,6 +77,34 @@ public class RefreshEndpointTests(PostgresFixture db)
     }
 
     [Fact]
+    public async Task Refresh_does_not_extend_the_original_seven_day_window()
+    {
+        using var factory = Factory();
+        using var client = RawClient(factory);
+        var (_, first) = await Register(client);
+        _clock.Advance(TimeSpan.FromDays(3));
+
+        var second = CookieValue(await Refresh(client, first));
+
+        (await Stored(second)).ExpiresAt.Should().Be(Start.AddDays(7));
+    }
+
+    [Fact]
+    public async Task Refresh_after_seven_days_returns_401()
+    {
+        using var factory = Factory();
+        using var client = RawClient(factory);
+        var (_, a) = await Register(client);
+        _clock.Advance(TimeSpan.FromDays(3));
+        var b = CookieValue(await Refresh(client, a));
+        _clock.Advance(TimeSpan.FromDays(3));
+        var c = CookieValue(await Refresh(client, b));
+        _clock.Advance(TimeSpan.FromDays(1) + TimeSpan.FromSeconds(1));
+
+        (await Refresh(client, c)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Refresh_without_a_cookie_or_with_an_unknown_token_returns_401()
     {
         using var factory = Factory();
@@ -149,19 +177,17 @@ public class RefreshEndpointTests(PostgresFixture db)
     }
 
     [Fact]
-    public async Task Replaying_a_just_rotated_token_inside_the_grace_window_does_not_kill_the_session()
+    public async Task Immediate_replay_revokes_the_new_token()
     {
-        // Two tabs refreshing together: the slower one must fail without revoking the winner's new token.
         using var factory = Factory();
         using var client = RawClient(factory);
         var (_, first) = await Register(client);
         var second = CookieValue(await Refresh(client, first));
-        _clock.Advance(TimeSpan.FromSeconds(5));
 
         (await Refresh(client, first)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        (await Stored(second)).IsRevoked.Should().BeFalse();
-        (await Refresh(client, second)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Stored(second)).IsRevoked.Should().BeTrue();
+        (await Refresh(client, second)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]

@@ -6,13 +6,15 @@ import { authGuard, guestGuard } from './auth.guard';
 
 describe('guards', () => {
   const user = signal<UserDto | null>(null);
+  const sessionExpired = signal(false);
   const run = (guard: typeof authGuard, url = '/boards') =>
     TestBed.runInInjectionContext(() => guard({} as never, { url } as RouterStateSnapshot));
 
   beforeEach(() => {
     user.set(null);
+    sessionExpired.set(false);
     TestBed.configureTestingModule({
-      providers: [provideRouter([]), { provide: AuthService, useValue: { user } }],
+      providers: [provideRouter([]), { provide: AuthService, useValue: { user, sessionExpired } }],
     });
   });
 
@@ -26,6 +28,12 @@ describe('guards', () => {
     expect(TestBed.inject(Router).serializeUrl(result)).toBe(
       '/auth/sign-in?returnUrl=%2Fboards%2F42%3Ftab%3Dcards',
     );
+  });
+
+  it('authGuard adds reason=expired when the session was lost', () => {
+    sessionExpired.set(true);
+    const result = run(authGuard, '/boards') as UrlTree;
+    expect(TestBed.inject(Router).serializeUrl(result)).toBe('/auth/sign-in?returnUrl=%2Fboards&reason=expired');
   });
 
   it('guestGuard lets a guest through', () => {

@@ -25,7 +25,11 @@ export class SignInPage {
   });
 
   protected readonly pending = signal(false);
-  protected readonly error = signal<string | null>(null);
+  protected readonly error = signal<string | null>(
+    this.route.snapshot.queryParamMap.get('reason') === 'expired'
+      ? 'Your session has expired, please sign in again'
+      : null,
+  );
 
   protected submit(): void {
     if (this.pending()) return;
