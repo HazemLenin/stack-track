@@ -13,24 +13,24 @@ using Microsoft.EntityFrameworkCore;
 
 namespace StackTrack.Api.Tests.Boards;
 
-public record ReadBoard(Guid BoardId) : IRequest<string>, IBoardScoped;
+public record ReadBoardQuery(Guid BoardId) : IRequest<string>, IBoardScoped;
 
-public record RenameBoard(Guid BoardId) : IRequest<string>, IBoardScoped, IWriteRequest;
+public record RenameBoardCommand(Guid BoardId) : IRequest<string>, IBoardScoped, IWriteRequest;
 
-public record ReadList(Guid ListId) : IRequest<string>, IListScoped;
+public record ReadListQuery(Guid ListId) : IRequest<string>, IListScoped;
 
-public record ReadCard(Guid CardId) : IRequest<string>, ICardScoped;
+public record ReadCardQuery(Guid CardId) : IRequest<string>, ICardScoped;
 
-public record ReadLabel(Guid LabelId) : IRequest<string>, ILabelScoped;
+public record ReadLabelQuery(Guid LabelId) : IRequest<string>, ILabelScoped;
 
-public record ReadComment(Guid CommentId) : IRequest<string>, ICommentScoped;
+public record ReadCommentQuery(Guid CommentId) : IRequest<string>, ICommentScoped;
 
 // Moves a card to another list: touches the card's board and the destination list's board.
-public record MoveCard(Guid CardId, Guid ListId) : IRequest<string>, ICardScoped, IListScoped, IWriteRequest;
+public record MoveCardCommand(Guid CardId, Guid ListId) : IRequest<string>, ICardScoped, IListScoped, IWriteRequest;
 
-public class MoveCardHandler(AppDbContext db) : IRequestHandler<MoveCard, string>
+public class MoveCardCommandHandler(AppDbContext db) : IRequestHandler<MoveCardCommand, string>
 {
-    public async Task<string> Handle(MoveCard request, CancellationToken ct)
+    public async Task<string> Handle(MoveCardCommand request, CancellationToken ct)
     {
         var card = await db.Cards.SingleAsync(c => c.Id == request.CardId, ct);
         card.ListId = request.ListId;
@@ -40,20 +40,20 @@ public class MoveCardHandler(AppDbContext db) : IRequestHandler<MoveCard, string
 }
 
 public class BoardProbeHandlers :
-    IRequestHandler<ReadBoard, string>, IRequestHandler<RenameBoard, string>, IRequestHandler<ReadList, string>,
-    IRequestHandler<ReadCard, string>, IRequestHandler<ReadLabel, string>, IRequestHandler<ReadComment, string>
+    IRequestHandler<ReadBoardQuery, string>, IRequestHandler<RenameBoardCommand, string>, IRequestHandler<ReadListQuery, string>,
+    IRequestHandler<ReadCardQuery, string>, IRequestHandler<ReadLabelQuery, string>, IRequestHandler<ReadCommentQuery, string>
 {
-    public Task<string> Handle(ReadList request, CancellationToken ct) => Task.FromResult("ok");
+    public Task<string> Handle(ReadListQuery request, CancellationToken ct) => Task.FromResult("ok");
 
-    public Task<string> Handle(ReadCard request, CancellationToken ct) => Task.FromResult("ok");
+    public Task<string> Handle(ReadCardQuery request, CancellationToken ct) => Task.FromResult("ok");
 
-    public Task<string> Handle(ReadLabel request, CancellationToken ct) => Task.FromResult("ok");
+    public Task<string> Handle(ReadLabelQuery request, CancellationToken ct) => Task.FromResult("ok");
 
-    public Task<string> Handle(ReadComment request, CancellationToken ct) => Task.FromResult("ok");
+    public Task<string> Handle(ReadCommentQuery request, CancellationToken ct) => Task.FromResult("ok");
 
-    public Task<string> Handle(ReadBoard request, CancellationToken ct) => Task.FromResult("ok");
+    public Task<string> Handle(ReadBoardQuery request, CancellationToken ct) => Task.FromResult("ok");
 
-    public Task<string> Handle(RenameBoard request, CancellationToken ct) => Task.FromResult("ok");
+    public Task<string> Handle(RenameBoardCommand request, CancellationToken ct) => Task.FromResult("ok");
 }
 
 [Collection(PostgresCollection.Name)]
@@ -103,7 +103,7 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
     {
         var (owner, board) = await SeedBoard();
 
-        (await Send(owner, new RenameBoard(board.Id))).Should().Be("ok");
+        (await Send(owner, new RenameBoardCommand(board.Id))).Should().Be("ok");
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
         var other = NewUser();
         await Save(other);
 
-        var act = () => Send(other, new ReadBoard(board.Id));
+        var act = () => Send(other, new ReadBoardQuery(board.Id));
 
         await act.Should().ThrowAsync<NotFoundException>();
     }
@@ -125,8 +125,8 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
         var other = NewUser();
         await Save(other);
 
-        var denied = await FluentActions.Awaiting(() => Send(other, new ReadBoard(board.Id))).Should().ThrowAsync<NotFoundException>();
-        var unknown = await FluentActions.Awaiting(() => Send(other, new ReadBoard(Guid.NewGuid()))).Should().ThrowAsync<NotFoundException>();
+        var denied = await FluentActions.Awaiting(() => Send(other, new ReadBoardQuery(board.Id))).Should().ThrowAsync<NotFoundException>();
+        var unknown = await FluentActions.Awaiting(() => Send(other, new ReadBoardQuery(Guid.NewGuid()))).Should().ThrowAsync<NotFoundException>();
 
         denied.Which.Message.Should().Be(unknown.Which.Message);
         denied.Which.Message.Should().NotContain(board.Id.ToString());
@@ -139,8 +139,8 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
         var admin = NewUser(UserRole.Admin);
         await Save(admin);
 
-        (await Send(admin, new ReadBoard(board.Id))).Should().Be("ok");
-        await FluentActions.Awaiting(() => Send(admin, new RenameBoard(board.Id))).Should().ThrowAsync<ForbiddenException>();
+        (await Send(admin, new ReadBoardQuery(board.Id))).Should().Be("ok");
+        await FluentActions.Awaiting(() => Send(admin, new RenameBoardCommand(board.Id))).Should().ThrowAsync<ForbiddenException>();
     }
 
     // A board with one list, card, label and comment, owned by the returned user.
@@ -156,10 +156,10 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
         await Save(comment);
         return (owner, new()
         {
-            ["list"] = new ReadList(list.Id),
-            ["card"] = new ReadCard(card.Id),
-            ["label"] = new ReadLabel(label.Id),
-            ["comment"] = new ReadComment(comment.Id),
+            ["list"] = new ReadListQuery(list.Id),
+            ["card"] = new ReadCardQuery(card.Id),
+            ["label"] = new ReadLabelQuery(label.Id),
+            ["comment"] = new ReadCommentQuery(comment.Id),
         });
     }
 
@@ -188,10 +188,10 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
         var (owner, _) = await SeedChildren();
         IRequest<string> request = kind switch
         {
-            "list" => new ReadList(Guid.NewGuid()),
-            "card" => new ReadCard(Guid.NewGuid()),
-            "label" => new ReadLabel(Guid.NewGuid()),
-            _ => new ReadComment(Guid.NewGuid()),
+            "list" => new ReadListQuery(Guid.NewGuid()),
+            "card" => new ReadCardQuery(Guid.NewGuid()),
+            "label" => new ReadLabelQuery(Guid.NewGuid()),
+            _ => new ReadCommentQuery(Guid.NewGuid()),
         };
 
         await FluentActions.Awaiting(() => Send(owner, request)).Should().ThrowAsync<NotFoundException>();
@@ -209,10 +209,10 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
         await Save(member, sourceList, foreignList);
         await Save(card, new BoardMember { BoardId = other.Id, UserId = member.Id, JoinedAt = DateTimeOffset.UtcNow });
 
-        await FluentActions.Awaiting(() => Send(member, new MoveCard(card.Id, foreignList.Id))).Should().ThrowAsync<NotFoundException>();
+        await FluentActions.Awaiting(() => Send(member, new MoveCardCommand(card.Id, foreignList.Id))).Should().ThrowAsync<NotFoundException>();
 
         await using var context = db.CreateContext();
         (await context.Cards.SingleAsync(c => c.Id == card.Id)).ListId.Should().Be(sourceList.Id);
-        (await Send(member, new MoveCard(card.Id, sourceList.Id))).Should().Be("ok");
+        (await Send(member, new MoveCardCommand(card.Id, sourceList.Id))).Should().Be("ok");
     }
 }

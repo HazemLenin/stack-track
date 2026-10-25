@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { API_BASE_URL } from './api-base-url';
 import { boardAccessInterceptor } from './board-access.interceptor';
+import { appInterceptors } from '../app.config';
 import { ToastService } from './toast.service';
 
 describe('boardAccessInterceptor', () => {
@@ -50,5 +51,23 @@ describe('boardAccessInterceptor', () => {
     fail('/api/boards/abc', 500);
     expect(show).not.toHaveBeenCalled();
     expect(navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('is the last toast when wired with the error interceptor as in the app', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors(appInterceptors)),
+        provideHttpClientTesting(),
+        { provide: API_BASE_URL, useValue: '/api' },
+        { provide: ToastService, useValue: { show } },
+        { provide: Router, useValue: { navigateByUrl } },
+      ],
+    });
+    TestBed.inject(HttpClient).get('/api/boards/abc').subscribe({ error: () => undefined });
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/boards/abc')
+      .flush({ detail: 'The board was not found.' }, { status: 404, statusText: 'Not Found' });
+    expect(show).toHaveBeenLastCalledWith('This board is no longer available');
   });
 });

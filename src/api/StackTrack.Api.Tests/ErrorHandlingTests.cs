@@ -50,6 +50,21 @@ public class ErrorHandlingTests
             .Should().Be(response.Headers.GetValues("X-Correlation-Id").Single());
     }
 
+    [Theory]
+    [InlineData("/test/no-access", HttpStatusCode.NotFound)]
+    [InlineData("/test/read-only", HttpStatusCode.Forbidden)]
+    public async Task Board_access_errors_return_problem_details(string path, HttpStatusCode expected)
+    {
+        using var client = new ApiFactory().CreateClient();
+
+        var response = await client.GetAsync(path);
+
+        response.StatusCode.Should().Be(expected);
+        response.Content.Headers.ContentType!.MediaType.Should().Be(ProblemJson);
+        (await ReadJson(response)).GetProperty("traceId").GetString()
+            .Should().Be(response.Headers.GetValues("X-Correlation-Id").Single());
+    }
+
     [Fact]
     public async Task Unknown_route_returns_404_problem_details()
     {
