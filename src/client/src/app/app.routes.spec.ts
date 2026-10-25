@@ -82,6 +82,14 @@ describe('routes', () => {
       });
     }
 
+    it('after sign out, navigating back to /boards redirects to sign in', async () => {
+      await harness.navigateByUrl('/boards');
+      user.set(null);
+      await harness.navigateByUrl('/auth/sign-in');
+      await harness.navigateByUrl('/boards');
+      expect(url()).toBe('/auth/sign-in?returnUrl=%2Fboards');
+    });
+
     for (const page of ['/auth/sign-in', '/auth/sign-up', '/auth']) {
       it(`keeps the user away from ${page}`, async () => {
         await harness.navigateByUrl(page);

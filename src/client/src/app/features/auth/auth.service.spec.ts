@@ -123,6 +123,7 @@ describe('AuthService', () => {
     req.flush(null, { status: 204, statusText: 'No Content' });
 
     expect(service.user()).toBeNull();
+    expect(localStorage.getItem(FLAG)).toBeNull();
   });
 
   it('signIn posts the credentials and keeps the session in memory', () => {
