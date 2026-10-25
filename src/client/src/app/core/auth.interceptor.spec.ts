@@ -113,3 +113,27 @@ describe('authInterceptor', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 });
+
+describe('authInterceptor with the real AuthService', () => {
+  it('parallel 401s share one refresh and all succeed', () => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(withInterceptors([authInterceptor])), provideHttpClientTesting(), provideRouter([])],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const client = TestBed.inject(HttpClient);
+    const urls = ['/api/a', '/api/b', '/api/c'];
+    const results: unknown[] = [];
+    urls.forEach((url) => client.get(url).subscribe((r) => results.push(r)));
+
+    urls.forEach((url) => http.expectOne(url).flush({}, { status: 401, statusText: 'Unauthorized' }));
+    http.expectOne('/api/auth/refresh').flush(refreshed);
+    urls.forEach((url) => {
+      const retry = http.expectOne(url);
+      expect(retry.request.headers.get('Authorization')).toBe('Bearer jwt-2');
+      retry.flush({ ok: url });
+    });
+
+    expect(results).toHaveLength(3);
+    http.verify();
+  });
+});
