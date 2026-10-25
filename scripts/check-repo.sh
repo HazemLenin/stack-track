@@ -29,12 +29,12 @@ done
 
 # KAN-13: local dev environment
 grep -q 'image: postgres:18' docker-compose.yml 2>/dev/null || fail "docker-compose.yml must use postgres:18"
-grep -q 'stacktrack-db:/var/lib/postgresql$' docker-compose.yml 2>/dev/null || fail "docker-compose.yml needs named volume on /var/lib/postgresql"
+grep -Eq 'stacktrack-db:/var/lib/postgresql\s*$' docker-compose.yml 2>/dev/null || fail "docker-compose.yml needs named volume on /var/lib/postgresql"
 grep -q 'POSTGRES_PASSWORD:-' docker-compose.yml 2>/dev/null || fail "docker-compose.yml must read POSTGRES_PASSWORD from env with default"
 git check-ignore -q .env || fail ".env must be ignored"
 git check-ignore -q .env.example && fail ".env.example must not be ignored"
 for v in POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB POSTGRES_PORT ConnectionStrings__Default; do
-  grep -q "^#\? *$v=" .env.example 2>/dev/null || fail ".env.example missing $v"
+  grep -Eq "^#? *$v=" .env.example 2>/dev/null || fail ".env.example missing $v"
 done
 
 [ "$failures" -eq 0 ] && echo "OK" || exit 1

@@ -1,7 +1,6 @@
 services:
   db:
     image: postgres:18-alpine
-    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-stacktrack}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stacktrack}

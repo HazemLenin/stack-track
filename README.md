@@ -31,7 +31,7 @@ curl -i http://localhost:5009/health   # 200 {"status":"Healthy","checks":{"data
 - Data lives in the named volume `stacktrack-db`. `docker compose stop` / `start` keeps it; `docker compose down -v` wipes it.
 - `/health` returns `503` with `database: Unhealthy` while Postgres is stopped.
 - Defaults (`stacktrack` / `stacktrack`) are local-only. To override, copy `.env.example` to `.env` (gitignored). The API reads `ConnectionStrings:Default` from `appsettings.Development.json`; override it with the `ConnectionStrings__Default` environment variable or `dotnet user-secrets`. Never commit real credentials.
-- Upgrading from the old Postgres 17 volume: run `docker compose down -v` once (Postgres 18 uses a different data layout).
+- Upgrading from the old Postgres 17 volume: run `docker compose down -v` once, which destroys local data (Postgres 18 uses a different data layout).
 
 ## How to run
 
