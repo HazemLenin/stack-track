@@ -7,12 +7,16 @@ using Microsoft.Extensions.Logging;
 
 namespace StackTrack.Api.Tests.TestSupport;
 
-public class ApiFactory(string environment = "Production", ILoggerProvider? loggerProvider = null)
+public class ApiFactory(
+    string environment = "Production",
+    ILoggerProvider? loggerProvider = null,
+    string connectionString = "Host=localhost;Port=1;Timeout=1;Username=x;Password=x;Database=x")
     : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment(environment);
+        builder.UseSetting("ConnectionStrings:Default", connectionString);
 
         builder.ConfigureServices(services =>
         {
