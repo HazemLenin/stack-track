@@ -7,8 +7,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using StackTrack.Application.Auth;
+using StackTrack.Application.Boards;
 using StackTrack.Domain.Entities;
 using StackTrack.Infrastructure.Auth;
+using StackTrack.Infrastructure.Boards;
 using StackTrack.Infrastructure.Persistence;
 
 namespace StackTrack.Infrastructure;
@@ -52,6 +54,9 @@ public static class DependencyInjection
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITokenService, TokenService>();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, CurrentUser>();
+        services.AddScoped<IBoardAccess, BoardAccess>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         services.AddHealthChecks().AddDbContextCheck<AppDbContext>("database");
