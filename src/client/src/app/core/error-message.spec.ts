@@ -8,7 +8,11 @@ describe('toUserMessage', () => {
     expect(toUserMessage(err(0))).toBe("Can't reach the server. Please try again in a moment.");
   });
 
-  it.each([500, 503])('maps %i to a generic server message', (status) => {
+  it.each([0, 502, 503, 504])('maps %i to the cannot-reach message', (status) => {
+    expect(toUserMessage(err(status))).toBe("Can't reach the server. Please try again in a moment.");
+  });
+
+  it.each([500, 501])('maps %i to a generic server message', (status) => {
     expect(toUserMessage(err(status))).toBe('Something went wrong on our side. Please try again.');
   });
 

@@ -19,7 +19,7 @@
 - Feature areas (exact route paths): `auth`, `boards`, `admin`, `my-cards`. Each `src/client/src/app/features/<name>/<name>.routes.ts` + one placeholder standalone component.
 - API base URL: `environment.apiBaseUrl`, value `/api` in dev and prod files (prod behind same-origin reverse proxy is a later ticket). Exposed via injection token `API_BASE_URL`.
 - Dev proxy: `src/client/proxy.conf.json` maps `/api` -> `http://localhost:5009`, `pathRewrite {"^/api": ""}` (API has no `/api` prefix; API untouched).
-- Error UX: toast only, page stays rendered. Status `0` -> "Can't reach the server. Please try again in a moment." ; `>=500` -> "Something went wrong on our side. Please try again." ; other 4xx -> ProblemDetails `detail` ?? `title` if string, else "The request could not be completed."; 401 is left to the Authentication epic (no toast). Never show raw `HttpErrorResponse` text. Error is always re-thrown.
+- Error UX: toast only, page stays rendered. Status `0`/`502`/`503`/`504` -> "Can't reach the server. Please try again in a moment." ; other `>=500` -> "Something went wrong on our side. Please try again." ; other 4xx -> ProblemDetails `detail` ?? `title` if string, else "The request could not be completed."; 401 is left to the Authentication epic (no toast). Never show raw `HttpErrorResponse` text. Error is always re-thrown.
 - Do not edit `src/api`, docs outside plan/Notion. Commits: `KAN-12: message`. Branch `feature/KAN-12-frontend-scaffold` in a new worktree.
 
 ## Review Focus
