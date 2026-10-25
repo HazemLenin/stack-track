@@ -72,6 +72,69 @@ describe('AuthService', () => {
     expect(service.user()).toBeNull();
   });
 
+  it('signIn posts the credentials and keeps the session in memory', () => {
+    service.signIn('sara@example.com', 'Valid1234').subscribe();
+
+    const req = http.expectOne('/api/auth/sign-in');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ email: 'sara@example.com', password: 'Valid1234' });
+    req.flush(response);
+
+    expect(service.user()?.displayName).toBe('Sara Ahmed');
+    expect(service.accessToken()).toBe('jwt-1');
+  });
+
+  it('refresh replaces the access token', () => {
+    service.refresh().subscribe();
+    const req = http.expectOne('/api/auth/refresh');
+    expect(req.request.method).toBe('POST');
+    req.flush({ ...response, accessToken: 'jwt-2' });
+
+    expect(service.accessToken()).toBe('jwt-2');
+  });
+
+  it('concurrent refresh calls share one request', () => {
+    service.refresh().subscribe();
+    service.refresh().subscribe();
+
+    http.expectOne('/api/auth/refresh').flush(response);
+    expect(service.accessToken()).toBe('jwt-1');
+  });
+
+  it('a failed refresh clears the session', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+
+    service.refresh().subscribe({ error: () => undefined });
+    http.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    expect(service.user()).toBeNull();
+  });
+
+  it('a later refresh makes a new request after the first one finished', () => {
+    service.refresh().subscribe();
+    http.expectOne('/api/auth/refresh').flush(response);
+
+    service.refresh().subscribe();
+    http.expectOne('/api/auth/refresh').flush(response);
+  });
+
+  it('restore signs the user in from the refresh cookie', async () => {
+    const done = service.restore();
+    http.expectOne('/api/auth/refresh').flush(response);
+    await done;
+
+    expect(service.user()?.email).toBe('sara@example.com');
+  });
+
+  it('restore without a valid cookie stays signed out and does not throw', async () => {
+    const done = service.restore();
+    http.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+
+    await expect(done).resolves.toBeUndefined();
+    expect(service.user()).toBeNull();
+  });
+
   it('signOut clears the session even when the request fails', () => {
     service.register(request).subscribe();
     http.expectOne('/api/auth/register').flush(response);

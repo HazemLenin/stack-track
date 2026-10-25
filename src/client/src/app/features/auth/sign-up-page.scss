@@ -1,34 +1,3 @@
-.stage {
-  display: grid;
-  justify-items: center;
-  padding: 24px 0;
-  background: linear-gradient(180deg, var(--mat-sys-primary-container), transparent 240px);
-}
-
-.card {
-  display: grid;
-  gap: 4px;
-  width: 100%;
-  max-width: 400px;
-  box-sizing: border-box;
-  padding: 28px;
-  background: var(--mat-sys-surface);
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: 16px;
-  box-shadow: var(--mat-sys-level2);
-}
-
-h1 {
-  margin: 0;
-  font: var(--mat-sys-headline-small);
-  letter-spacing: -0.02em;
-}
-
-.sub {
-  margin: 0 0 12px;
-  color: var(--mat-sys-on-surface-variant);
-}
-
 .rules {
   display: grid;
   gap: 3px;
@@ -71,9 +40,4 @@ h1 {
       }
     }
   }
-}
-
-button[type='submit'] {
-  margin-top: 8px;
-  height: 44px;
 }

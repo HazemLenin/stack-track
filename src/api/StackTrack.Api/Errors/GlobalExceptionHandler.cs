@@ -36,6 +36,43 @@ public class GlobalExceptionHandler(
                 };
                 break;
 
+            case InvalidCredentialsException invalid:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status401Unauthorized,
+                    Title = "Unauthorized",
+                    Detail = invalid.Message,
+                };
+                break;
+
+            case InvalidRefreshTokenException expired:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status401Unauthorized,
+                    Title = "Unauthorized",
+                    Detail = expired.Message,
+                };
+                break;
+
+            case AccountDeactivatedException deactivated:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status403Forbidden,
+                    Title = "Forbidden",
+                    Detail = deactivated.Message,
+                };
+                break;
+
+            case AccountLockedException locked:
+                problem = new ProblemDetails
+                {
+                    Status = StatusCodes.Status423Locked,
+                    Title = "Locked",
+                    Detail = locked.Message,
+                };
+                problem.Extensions["lockedUntil"] = locked.LockedUntil.UtcDateTime;
+                break;
+
             case BadHttpRequestException:
                 problem = new ProblemDetails
                 {

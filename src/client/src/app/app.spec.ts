@@ -37,12 +37,12 @@ describe('App', () => {
     expect(el.querySelector('main router-outlet')).toBeTruthy();
   });
 
-  it('offers sign up and hides the user name when signed out', async () => {
+  it('offers sign in and hides the user name when signed out', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
 
-    expect(el.querySelector('a[href="/auth/sign-up"]')).toBeTruthy();
+    expect(el.querySelector('a[href="/auth/sign-in"]')?.textContent).toContain('Sign in');
     expect(el.querySelector('.user')).toBeNull();
     expect(text(el)).not.toContain('Sign out');
   });
@@ -55,10 +55,10 @@ describe('App', () => {
 
     expect(el.querySelector('.user')?.textContent).toContain('Sara Ahmed');
     expect(text(el)).toContain('Sign out');
-    expect(el.querySelector('a[href="/auth/sign-up"]')).toBeNull();
+    expect(el.querySelector('a[href="/auth/sign-in"]')).toBeNull();
   });
 
-  it('signs out through the API and returns to sign up', async () => {
+  it('signs out through the API and returns to sign in', async () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
     const fixture = TestBed.createComponent(App);
     signIn();
@@ -69,6 +69,6 @@ describe('App', () => {
     await fixture.whenStable();
 
     expect(TestBed.inject(AuthService).user()).toBeNull();
-    expect(navigate).toHaveBeenCalledWith('/auth/sign-up');
+    expect(navigate).toHaveBeenCalledWith('/auth/sign-in');
   });
 });

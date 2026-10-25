@@ -19,8 +19,8 @@ export class App {
   protected signOut(): void {
     // The session is cleared whether or not the request succeeds.
     this.auth.signOut().subscribe({
-      complete: () => this.router.navigateByUrl('/auth/sign-up'),
-      error: () => this.router.navigateByUrl('/auth/sign-up'),
+      complete: () => this.router.navigateByUrl('/auth/sign-in'),
+      error: () => this.router.navigateByUrl('/auth/sign-in'),
     });
   }
 }

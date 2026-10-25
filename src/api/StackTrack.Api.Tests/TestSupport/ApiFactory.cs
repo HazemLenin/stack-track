@@ -10,7 +10,8 @@ namespace StackTrack.Api.Tests.TestSupport;
 public class ApiFactory(
     string environment = "Production",
     ILoggerProvider? loggerProvider = null,
-    string connectionString = "Host=localhost;Port=1;Timeout=1;Username=x;Password=x;Database=x")
+    string connectionString = "Host=localhost;Port=1;Timeout=1;Username=x;Password=x;Database=x",
+    TimeProvider? clock = null)
     : WebApplicationFactory<Program>
 {
     public const string JwtSecret = "test-secret-test-secret-test-secret-0123456789";
@@ -30,6 +31,8 @@ public class ApiFactory(
 
         builder.ConfigureServices(services =>
         {
+            // Last registration wins, so this replaces TimeProvider.System from AddInfrastructure.
+            if (clock is not null) services.AddSingleton(clock);
             services.AddControllers().AddApplicationPart(typeof(TestController).Assembly);
             services.AddMediatR(c => c.RegisterServicesFromAssemblyContaining<TestController>());
             services.AddValidatorsFromAssemblyContaining<ValidateCommandValidator>();
