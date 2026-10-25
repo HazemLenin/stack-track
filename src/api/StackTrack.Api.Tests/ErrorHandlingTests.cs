@@ -54,6 +54,7 @@ public class ErrorHandlingTests
     public async Task Unknown_route_returns_404_problem_details()
     {
         using var client = new ApiFactory().CreateClient();
+        client.DefaultRequestHeaders.Authorization = new("Bearer", ApiFactory.TokenFor("Member"));
 
         var response = await client.GetAsync("/does-not-exist");
 
@@ -61,6 +62,16 @@ public class ErrorHandlingTests
         response.Content.Headers.ContentType!.MediaType.Should().Be(ProblemJson);
         (await ReadJson(response)).GetProperty("traceId").GetString()
             .Should().Be(response.Headers.GetValues("X-Correlation-Id").Single());
+    }
+
+    [Fact]
+    public async Task Unknown_route_returns_401_when_anonymous()
+    {
+        using var client = new ApiFactory().CreateClient();
+
+        var response = await client.GetAsync("/does-not-exist");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]

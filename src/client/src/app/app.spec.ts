@@ -15,7 +15,7 @@ describe('App', () => {
 
   const text = (el: HTMLElement) => el.querySelector('mat-toolbar')?.textContent ?? '';
 
-  function signIn() {
+  function signIn(role = 'Member') {
     TestBed.inject(AuthService)
       .register({ displayName: 'Sara Ahmed', email: 's@x.com', password: 'Valid1234', confirmPassword: 'Valid1234' })
       .subscribe();
@@ -24,7 +24,7 @@ describe('App', () => {
       .flush({
         accessToken: 'jwt',
         accessTokenExpiresAt: '2026-10-25T12:15:00Z',
-        user: { id: '1', email: 's@x.com', displayName: 'Sara Ahmed', role: 'Member' },
+        user: { id: '1', email: 's@x.com', displayName: 'Sara Ahmed', role },
       });
   }
 
@@ -55,6 +55,22 @@ describe('App', () => {
 
     expect(el.querySelector('button.user')?.textContent).toContain('Sara Ahmed');
     expect(el.querySelector('a[href="/auth/sign-in"]')).toBeNull();
+  });
+
+  it('hides the Admin link for a Member', async () => {
+    const fixture = TestBed.createComponent(App);
+    signIn();
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href="/admin/users"]')).toBeNull();
+  });
+
+  it('shows the Admin link for an Admin', async () => {
+    const fixture = TestBed.createComponent(App);
+    signIn('Admin');
+    await fixture.whenStable();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href="/admin/users"]')?.textContent).toContain('Admin');
   });
 
   async function openMenuAndSignOut() {

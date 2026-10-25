@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
@@ -16,6 +16,7 @@ export class App {
   private readonly router = inject(Router);
 
   protected readonly user = this.auth.user;
+  protected readonly isAdmin = computed(() => this.user()?.role === 'Admin');
 
   protected signOut(): void {
     // The session is cleared whether or not the request succeeds.

@@ -1,9 +1,13 @@
+using System.Security.Claims;
+using System.Text;
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 
 namespace StackTrack.Api.Tests.TestSupport;
 
@@ -19,6 +23,18 @@ public class ApiFactory(
     // https so the Secure refresh cookie is sent back by the test client's cookie container.
     public HttpClient CreateApiClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
+
+    // A valid access token signed with the test key, for tests that need no database.
+    public static string TokenFor(string role, Guid? userId = null) =>
+        new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = "stacktrack-tests",
+            Audience = "stacktrack-tests",
+            Expires = DateTime.UtcNow.AddMinutes(5),
+            Subject = new ClaimsIdentity([new Claim("sub", (userId ?? Guid.NewGuid()).ToString()), new Claim("role", role)]),
+            SigningCredentials = new SigningCredentials(
+                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret)), SecurityAlgorithms.HmacSha256),
+        });
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
