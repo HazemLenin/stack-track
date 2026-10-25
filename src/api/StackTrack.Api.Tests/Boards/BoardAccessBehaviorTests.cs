@@ -8,6 +8,8 @@ using StackTrack.Application.Boards;
 using StackTrack.Application.Errors;
 using StackTrack.Domain.Entities;
 using StackTrack.Infrastructure.Boards;
+using StackTrack.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace StackTrack.Api.Tests.Boards;
 
@@ -22,6 +24,20 @@ public record ReadCard(Guid CardId) : IRequest<string>, ICardScoped;
 public record ReadLabel(Guid LabelId) : IRequest<string>, ILabelScoped;
 
 public record ReadComment(Guid CommentId) : IRequest<string>, ICommentScoped;
+
+// Moves a card to another list: touches the card's board and the destination list's board.
+public record MoveCard(Guid CardId, Guid ListId) : IRequest<string>, ICardScoped, IListScoped, IWriteRequest;
+
+public class MoveCardHandler(AppDbContext db) : IRequestHandler<MoveCard, string>
+{
+    public async Task<string> Handle(MoveCard request, CancellationToken ct)
+    {
+        var card = await db.Cards.SingleAsync(c => c.Id == request.CardId, ct);
+        card.ListId = request.ListId;
+        await db.SaveChangesAsync(ct);
+        return "ok";
+    }
+}
 
 public class BoardProbeHandlers :
     IRequestHandler<ReadBoard, string>, IRequestHandler<RenameBoard, string>, IRequestHandler<ReadList, string>,
@@ -179,5 +195,24 @@ public class BoardAccessBehaviorTests(PostgresFixture db)
         };
 
         await FluentActions.Awaiting(() => Send(owner, request)).Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task Move_into_inaccessible_board_is_rejected_and_card_stays()
+    {
+        var (_, other) = await SeedBoard();
+        var (_, foreignBoard) = await SeedBoard();
+        var sourceList = new BoardList { BoardId = other.Id, Name = "Doing" };
+        var foreignList = new BoardList { BoardId = foreignBoard.Id, Name = "Done" };
+        var member = NewUser();
+        var card = new Card { ListId = sourceList.Id, Title = "Ship it" };
+        await Save(member, sourceList, foreignList);
+        await Save(card, new BoardMember { BoardId = other.Id, UserId = member.Id, JoinedAt = DateTimeOffset.UtcNow });
+
+        await FluentActions.Awaiting(() => Send(member, new MoveCard(card.Id, foreignList.Id))).Should().ThrowAsync<NotFoundException>();
+
+        await using var context = db.CreateContext();
+        (await context.Cards.SingleAsync(c => c.Id == card.Id)).ListId.Should().Be(sourceList.Id);
+        (await Send(member, new MoveCard(card.Id, sourceList.Id))).Should().Be("ok");
     }
 }
