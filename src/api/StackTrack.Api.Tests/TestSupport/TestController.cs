@@ -11,6 +11,10 @@ public class ValidateCommandValidator : AbstractValidator<ValidateCommand>
     public ValidateCommandValidator()
     {
         RuleFor(c => c.Name).NotEmpty().MinimumLength(3);
+        RuleFor(c => c).Custom((c, context) =>
+        {
+            if (c.Name == "forbidden") context.AddFailure("Name is forbidden.");
+        });
     }
 }
 

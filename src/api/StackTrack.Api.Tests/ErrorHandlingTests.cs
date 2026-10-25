@@ -26,6 +26,17 @@ public class ErrorHandlingTests
     }
 
     [Fact]
+    public async Task Class_level_validation_failure_without_property_name_returns_400()
+    {
+        using var client = new ApiFactory().CreateClient();
+
+        var response = await client.PostAsJsonAsync("/test/validate", new { name = "forbidden" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadJson(response)).GetProperty("errors").EnumerateObject().Should().NotBeEmpty();
+    }
+
+    [Fact]
     public async Task Malformed_json_returns_400_problem_details()
     {
         using var client = new ApiFactory().CreateClient();
