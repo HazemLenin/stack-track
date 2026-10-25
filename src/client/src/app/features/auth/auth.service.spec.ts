@@ -126,6 +126,20 @@ describe('AuthService', () => {
     expect(localStorage.getItem(FLAG)).toBeNull();
   });
 
+  it('a refresh still in flight when the user signs out does not bring the session back', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+
+    service.refresh().subscribe({ error: () => undefined });
+    const refresh = http.expectOne('/api/auth/refresh');
+    service.signOut().subscribe();
+    http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+    refresh.flush(response);
+
+    expect(service.user()).toBeNull();
+    expect(localStorage.getItem(FLAG)).toBeNull();
+  });
+
   it('signIn posts the credentials and keeps the session in memory', () => {
     service.signIn('sara@example.com', 'Valid1234').subscribe();
 

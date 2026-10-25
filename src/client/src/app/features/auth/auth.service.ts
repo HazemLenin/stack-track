@@ -35,6 +35,9 @@ export class AuthService {
 
   private refreshing: Observable<AuthResponse> | null = null;
 
+  // Bumped on sign out so a refresh that was already in flight cannot bring the session back.
+  private generation = 0;
+
   // True once a session that existed (this tab or an earlier visit) was refused by the API.
   readonly sessionExpired = signal(false);
 
@@ -56,8 +59,12 @@ export class AuthService {
   // Trades the HttpOnly refresh cookie for a new access token. Concurrent callers share one request,
   // because the API rotates the cookie and a second use of the old one would be treated as theft.
   refresh(): Observable<AuthResponse> {
+    const generation = this.generation;
     this.refreshing ??= this.http.post<AuthResponse>(`${this.baseUrl}/auth/refresh`, null).pipe(
-      tap((response) => this.start(response)),
+      tap((response) => {
+        if (generation !== this.generation) throw new Error('signed out during refresh');
+        this.start(response);
+      }),
       catchError((error: HttpErrorResponse) => {
         this.session.set(null);
         // Refused (401) after someone had signed in: the session ran out, which is not the same as never signing in.
@@ -83,6 +90,8 @@ export class AuthService {
   }
 
   signOut(): Observable<void> {
+    this.generation++;
+    this.refreshing = null;
     return this.http
       .post<void>(`${this.baseUrl}/auth/sign-out`, null)
       .pipe(

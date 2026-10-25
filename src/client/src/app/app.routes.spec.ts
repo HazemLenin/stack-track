@@ -84,6 +84,7 @@ describe('routes', () => {
 
     it('after sign out, navigating back to /boards redirects to sign in', async () => {
       await harness.navigateByUrl('/boards');
+      expect(url()).toBe('/boards');
       user.set(null);
       await harness.navigateByUrl('/auth/sign-in');
       await harness.navigateByUrl('/boards');
