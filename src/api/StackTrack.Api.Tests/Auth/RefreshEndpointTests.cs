@@ -177,19 +177,17 @@ public class RefreshEndpointTests(PostgresFixture db)
     }
 
     [Fact]
-    public async Task Replaying_a_just_rotated_token_inside_the_grace_window_does_not_kill_the_session()
+    public async Task Immediate_replay_revokes_the_new_token()
     {
-        // Two tabs refreshing together: the slower one must fail without revoking the winner's new token.
         using var factory = Factory();
         using var client = RawClient(factory);
         var (_, first) = await Register(client);
         var second = CookieValue(await Refresh(client, first));
-        _clock.Advance(TimeSpan.FromSeconds(5));
 
         (await Refresh(client, first)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
-        (await Stored(second)).IsRevoked.Should().BeFalse();
-        (await Refresh(client, second)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Stored(second)).IsRevoked.Should().BeTrue();
+        (await Refresh(client, second)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]

@@ -14,8 +14,6 @@ namespace StackTrack.Infrastructure.Auth;
 
 public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimeProvider clock) : ITokenService
 {
-    static readonly TimeSpan RotationGrace = TimeSpan.FromSeconds(10);
-
     readonly JwtOptions _jwt = options.Value;
 
     public Task<IssuedTokens> IssueAsync(User user, CancellationToken ct) =>
@@ -64,10 +62,6 @@ public class TokenService(AppDbContext db, IOptions<JwtOptions> options, TimePro
 
         if (stored.IsRevoked)
         {
-            // Two tabs refreshing together replay a token rotated a moment ago. Fail the slower one
-            // without revoking the winner's new token.
-            if (stored.ReplacedByTokenId is not null && now - stored.UpdatedAt < RotationGrace) return null;
-
             // A used token is being replayed later: treat the whole chain after it as stolen.
             await RevokeChainAfterAsync(stored, ct);
             return null;
