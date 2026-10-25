@@ -21,7 +21,7 @@
 
 1. **Absolute expiry:** `RotateAsync` passes `stored.ExpiresAt` to a private issue helper; `IssueAsync` (sign-in/register) keeps `now + RefreshTokenDays`. No schema change.
 2. **Grace removed, concurrent claim race unchanged:** two requests that truly race on the same token still resolve in the atomic claim (loser gets 401, no chain revoke). Any request that arrives after the winner commits is a replay and revokes the chain. Multi-tab race can therefore force a re-sign-in; accepted per your answer. `RotationGrace` and its test are deleted.
-3. **Message trigger:** the interceptor adds `reason=expired` to the sign-in redirect only when a refresh fails after the app had a session. A visitor who never signed in does not see the message. Sign-in page shows it as the form error banner and leaves it when the query param is absent.
+3. **Message trigger (changed after review):** `reason=expired` is added only when the API refuses the refresh token (401) and someone had signed in before. "Signed in before" is a non-secret `stacktrack.signed-in` flag in `localStorage` (no token), set on sign-in/register/refresh and cleared on sign-out or when expiry is detected. This also covers a tab reopened after 7 days: startup `restore()` fails, `AuthService.sessionExpired` turns true and `authGuard` redirects with the reason. Network/5xx failures and first-time visitors get a plain redirect. Sign-in page shows the message as the form error banner. Your choice, replacing the memory-only rule for this one flag.
 4. **Deactivated user:** refresh already returns 401 for inactive users, so they can work until the current access token expires (15 min) and are then sent to sign-in with the expired-session message. No extra revoke on deactivation (out of scope).
 
 ## AC map
