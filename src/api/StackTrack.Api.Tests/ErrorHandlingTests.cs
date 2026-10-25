@@ -65,6 +65,16 @@ public class ErrorHandlingTests
     }
 
     [Fact]
+    public async Task Unknown_route_returns_401_when_anonymous()
+    {
+        using var client = new ApiFactory().CreateClient();
+
+        var response = await client.GetAsync("/does-not-exist");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Unhandled_exception_in_Production_returns_500_without_stack_or_message()
     {
         using var client = new ApiFactory("Production").CreateClient();
