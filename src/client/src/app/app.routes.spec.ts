@@ -22,6 +22,7 @@ describe('routes', () => {
     it(`renders ${name}`, async () => {
       await harness.navigateByUrl('/' + name);
       expect(h1()).toBe(name);
+      if (name === 'boards') expect(document.title).toBe('Stack Track');
     });
   }
 
@@ -29,6 +30,7 @@ describe('routes', () => {
     it(`shows not found for ${url}`, async () => {
       await harness.navigateByUrl(url);
       expect(h1()).toBe('Page not found');
+      expect(document.title).toBe('Page not found - Stack Track');
     });
   }
 });

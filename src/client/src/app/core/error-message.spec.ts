@@ -4,12 +4,10 @@ import { toUserMessage } from './error-message';
 const err = (status: number, error?: unknown) => new HttpErrorResponse({ status, error });
 
 describe('toUserMessage', () => {
-  it('maps status 0 to a friendly offline message', () => {
-    expect(toUserMessage(err(0))).toBe("Can't reach the server. Please try again in a moment.");
-  });
-
   it.each([0, 502, 503, 504])('maps %i to the cannot-reach message', (status) => {
-    expect(toUserMessage(err(status))).toBe("Can't reach the server. Please try again in a moment.");
+    expect(toUserMessage(err(status))).toBe(
+      "Can't reach the server. Please try again in a moment.",
+    );
   });
 
   it.each([500, 501])('maps %i to a generic server message', (status) => {
