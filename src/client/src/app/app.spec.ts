@@ -47,25 +47,40 @@ describe('App', () => {
     expect(text(el)).not.toContain('Sign out');
   });
 
-  it('shows the display name and a sign out button when signed in', async () => {
+  it('shows the display name on the user menu trigger when signed in', async () => {
     const fixture = TestBed.createComponent(App);
     signIn();
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
 
-    expect(el.querySelector('.user')?.textContent).toContain('Sara Ahmed');
-    expect(text(el)).toContain('Sign out');
+    expect(el.querySelector('button.user')?.textContent).toContain('Sara Ahmed');
     expect(el.querySelector('a[href="/auth/sign-in"]')).toBeNull();
   });
 
-  it('signs out through the API and returns to sign in', async () => {
-    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+  async function openMenuAndSignOut() {
     const fixture = TestBed.createComponent(App);
     signIn();
     await fixture.whenStable();
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button.user')!.click();
+    await fixture.whenStable();
+    document.querySelector<HTMLButtonElement>('.cdk-overlay-container button.sign-out')!.click();
+    return fixture;
+  }
 
-    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button.sign-out')!.click();
+  it('opens the user menu and signs out through the API, then goes to sign in', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const fixture = await openMenuAndSignOut();
     TestBed.inject(HttpTestingController).expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+    await fixture.whenStable();
+
+    expect(TestBed.inject(AuthService).user()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/auth/sign-in');
+  });
+
+  it('still signs out and goes to sign in when the API is unreachable', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const fixture = await openMenuAndSignOut();
+    TestBed.inject(HttpTestingController).expectOne('/api/auth/sign-out').flush(null, { status: 0, statusText: 'Unknown Error' });
     await fixture.whenStable();
 
     expect(TestBed.inject(AuthService).user()).toBeNull();
