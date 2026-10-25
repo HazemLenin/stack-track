@@ -129,6 +129,7 @@ export class AuthService {
   // A fresh sign in or registration: any refresh still shared from an earlier session is not reused.
   private begin(response: AuthResponse): void {
     this.refreshing = null;
+    this.signingOut = false;
     this.start(response);
   }
 
