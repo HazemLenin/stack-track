@@ -133,11 +133,26 @@ describe('AuthService', () => {
     service.refresh().subscribe({ error: () => undefined });
     const refresh = http.expectOne('/api/auth/refresh');
     service.signOut().subscribe();
-    http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+    // Sign out waits for the refresh, so it revokes the cookie the refresh just rotated to.
+    http.expectNone('/api/auth/sign-out');
     refresh.flush(response);
+    http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
 
     expect(service.user()).toBeNull();
     expect(localStorage.getItem(FLAG)).toBeNull();
+  });
+
+  it('a refresh refused after the user signed out is not reported as an expired session', () => {
+    service.register(request).subscribe();
+    http.expectOne('/api/auth/register').flush(response);
+
+    service.refresh().subscribe({ error: () => undefined });
+    const refresh = http.expectOne('/api/auth/refresh');
+    service.signOut().subscribe();
+    refresh.flush({}, { status: 401, statusText: 'Unauthorized' });
+    http.expectOne('/api/auth/sign-out').flush(null, { status: 204, statusText: 'No Content' });
+
+    expect(service.sessionExpired()).toBe(false);
   });
 
   it('signIn posts the credentials and keeps the session in memory', () => {

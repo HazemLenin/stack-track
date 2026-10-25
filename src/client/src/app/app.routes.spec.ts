@@ -89,6 +89,7 @@ describe('routes', () => {
       await harness.navigateByUrl('/auth/sign-in');
       await harness.navigateByUrl('/boards');
       expect(url()).toBe('/auth/sign-in?returnUrl=%2Fboards');
+      expect(h1()).not.toBe('My boards');
     });
 
     for (const page of ['/auth/sign-in', '/auth/sign-up', '/auth']) {
