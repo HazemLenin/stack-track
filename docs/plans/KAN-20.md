@@ -4,7 +4,7 @@
 
 **Spec:** Jira KAN-20 (subtasks KAN-71 API policies, KAN-72 Angular role guard, KAN-73 admin read-only board access), `CLAUDE.md`.
 
-**Branch:** `feature/KAN-20-roles` off `main`. KAN-21 and KAN-22 stack on this branch (PR bases chain 20 -> 21 -> 22).
+**Branch:** `feature/KAN-20-roles` off `main`. KAN-21 and KAN-22 each get their own branch and PR, chained by PR base (20 -> 21 -> 22).
 
 ## Gap analysis (ticket vs. current code)
 
